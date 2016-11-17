@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Data.Entity;
 using System.Data.Entity.Migrations;
 using System.Linq;
 using Apache.Ignite.Core.Cache.Store;
@@ -40,6 +41,7 @@ namespace IgniteEFCacheStore
         {
             using (var ctx = GetDbContext())
             {
+                ctx.Posts.Load();
                 return keys.Cast<int>().ToDictionary(key => key, key => ctx.Posts.Find(key));
             }
         }

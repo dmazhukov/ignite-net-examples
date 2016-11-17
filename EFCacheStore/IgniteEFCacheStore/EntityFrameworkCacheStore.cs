@@ -4,13 +4,14 @@ using System.Data.Entity;
 using System.Data.Entity.Migrations;
 using System.Linq;
 using Apache.Ignite.Core.Cache.Store;
+using Apache.Ignite.Core.Common;
 
 namespace IgniteEFCacheStore
 {
     /// <summary>
     /// Generic EF cache store.
     /// </summary>
-    public class EntityFrameworkCacheStore<TEntity, TContext> : ICacheStore 
+    public class EntityFrameworkCacheStore<TEntity, TContext> : ICacheStore
         where TEntity : class, new() where TContext : DbContext
     {
         private readonly Func<TContext> _getContext;
@@ -21,7 +22,7 @@ namespace IgniteEFCacheStore
 
         private readonly Action<TEntity, object> _setKey;
 
-        public EntityFrameworkCacheStore(Func<TContext> getContext, Func<TContext, IDbSet<TEntity>> getDbSet, 
+        public EntityFrameworkCacheStore(Func<TContext> getContext, Func<TContext, IDbSet<TEntity>> getDbSet,
             Func<TEntity, object> getKey, Action<TEntity, object> setKey)
         {
             if (getContext == null)
@@ -80,7 +81,7 @@ namespace IgniteEFCacheStore
 
             using (var ctx = _getContext())
             {
-                _getDbSet(ctx).AddOrUpdate((TEntity) val);
+                _getDbSet(ctx).AddOrUpdate((TEntity)val);
 
                 ctx.SaveChanges();
             }
@@ -143,6 +144,44 @@ namespace IgniteEFCacheStore
         public void SessionEnd(bool commit)
         {
             // No-op.
+        }
+    }
+
+    [Serializable]
+    public class EntityFrameworkCacheStoreFactory<TEntity, TContext> : IFactory<ICacheStore>
+        where TEntity : class, new() where TContext : DbContext
+    {
+        private readonly Func<TContext> _getContext;
+
+        private readonly Func<TContext, IDbSet<TEntity>> _getDbSet;
+
+        private readonly Func<TEntity, object> _getKey;
+
+        private readonly Action<TEntity, object> _setKey;
+
+        public EntityFrameworkCacheStoreFactory(Func<TContext> getContext, Func<TContext, IDbSet<TEntity>> getDbSet,
+            Func<TEntity, object> getKey, Action<TEntity, object> setKey)
+        {
+            if (getContext == null)
+                throw new ArgumentNullException(nameof(getContext));
+
+            if (getDbSet == null)
+                throw new ArgumentNullException(nameof(getDbSet));
+
+            if (getKey == null)
+                throw new ArgumentNullException(nameof(getKey));
+
+            if (setKey == null)
+                throw new ArgumentNullException(nameof(setKey));
+
+            _getContext = getContext;
+            _getDbSet = getDbSet;
+            _getKey = getKey;
+            _setKey = setKey;
+        }
+        public ICacheStore CreateInstance()
+        {
+            return new EntityFrameworkCacheStore<TEntity, TContext>(_getContext, _getDbSet, _getKey, _setKey);
         }
     }
 }

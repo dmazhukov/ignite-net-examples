@@ -1,69 +1,234 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.Entity.Core.Common.CommandTrees;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Apache.Ignite.Core;
+using Apache.Ignite.Core.Binary;
 using Apache.Ignite.Core.Cache;
 using Apache.Ignite.Core.Cache.Configuration;
+using Apache.Ignite.Core.Cache.Query;
+using Apache.Ignite.Linq;
 
 namespace IgniteEFCacheStore
 {
     public static class Program
     {
+        private static ICache<int, SalePoint> _salePoints;
+        private static ICache<int, Month> _months;
+        private static ICache<int, PaymentRequest> _paymentRequests;
+        private static ICache<int, Payment> _payments;
+        private static ICache<int, SellOut> _sellouts;
+        private static ICache<int, Contractor> _contractors;
+        private static IIgnite _ignite;
+
+
         public static void Main(string[] args)
         {
-            InitializeDb();
+            //InitializeDb();
 
-            using (var ignite = Ignition.StartFromApplicationConfiguration())
+            var td = new TimDbContext();
+            Console.WriteLine(td.SalePoints.Count());
+            Console.WriteLine(td.Months.Count());
+            Console.WriteLine(td.PaymentRequests.Count());
+            Console.WriteLine(td.Payments.Count());
+            Console.WriteLine(td.SellOuts.Count());
+            Console.WriteLine(td.Contractors.Count());
+
+
+            Environment.SetEnvironmentVariable("IGNITE_H2_DEBUG_CONSOLE", "true");
+            var cfg = new IgniteConfiguration
             {
-                var blogs = ignite.GetOrCreateCache<int, Blog>(new CacheConfiguration
-                {
-                    Name = "blogs",
-                    CacheStoreFactory = new BlogCacheStoreFactory(),
-                    ReadThrough = true,
-                    WriteThrough = true,
-                    KeepBinaryInStore = false   // Store works with concrete classes.
-                });
+                BinaryConfiguration = new BinaryConfiguration(typeof(SalePoint), typeof(Month),
+                typeof(Payment), typeof(PaymentRequest), typeof(SellOut), typeof(Contractor)),
+                //Localhost = "127.0.0.1",
+                GridName = "timtest"
+            };
+            //using (var ignite = Ignition.StartFromApplicationConfiguration())
+            //using (var ignite = Ignition.TryGetIgnite() ?? Ignition.Start(cfg))
+            _ignite = Ignition.TryGetIgnite("timtest");
+            bool exists = true;
+            if (_ignite == null)
+            {
+                exists = false;
+                _ignite = Ignition.Start(cfg);
+            }
 
-                var posts = ignite.GetOrCreateCache<int, Post>(new CacheConfiguration
-                {
-                    Name = "posts",
-                    CacheStoreFactory = new PostCacheStoreFactory(),
-                    ReadThrough = true,
-                    WriteThrough = true,
-                    KeepBinaryInStore = false   // Store works with concrete classes.
-                });
-
+            {
+                CreateCaches(_ignite);
                 Console.WriteLine("\n>>> Example started\n\n");
 
-                // Load all posts, but do not load blogs.
-                Console.WriteLine("Calling ICache.LoadCache...");
-                posts.LoadCache(null);
-
-                // Show all posts with their blogs.
-                DisplayData(posts, blogs);
-
-                // Add new data to cache.
-                Console.WriteLine("Adding new post to existing blog..");
-
-                var postId = posts.Max(x => x.Key) + 1;  // Generate new id.
-
-                posts[1] = new Post
+                if (_salePoints.GetSize() == 0)
                 {
-                    BlogId = blogs.Min(x => x.Key), // Existing blog
-                    PostId = postId,
-                    Title = "New Post From Ignite"
-                };
+                    LoadCaches();
+                }
 
-                // Show all posts with their blogs.
-                DisplayData(posts, blogs);
+                var c = _salePoints.AsCacheQueryable().Where(p => p.Value.RegionID == 193);
+                Console.WriteLine(c.Count());
+                var s = _sellouts.AsCacheQueryable().Where(p => p.Value.MonthID == 44);
+                Console.WriteLine(s.Count());
 
-                // Remove newly added post.
-                Console.WriteLine("Removing post with id {0}...", postId);
-                posts.Remove(postId);
-
-                Console.WriteLine("\n>>> Example finished.\n");
+                //var q = new SqlFieldsQuery(horribleQuery);
+                //var f = _months.QueryFields(q);
+                //f.GetAll();
+                Console.WriteLine("Press Q to quit, L to reload caches, R to run query, any key to display local stats");
+                while (true)
+                {
+                    switch (Console.ReadKey().KeyChar)
+                    {
+                        case 'q':
+                            return;
+                        case 'l':
+                            LoadCaches();
+                            break;
+                        case 'r':
+                            RunQuery();
+                            break;
+                        default:
+                            PrintStats();
+                            break;
+                    }
+                }
             }
+        }
+
+        private static void RunQuery()
+        {
+            var sw = Stopwatch.StartNew();
+            //var q = (from s in _sellouts.AsCacheQueryable()
+            //    where
+            //        !
+            //            (from ss in _sellouts.AsCacheQueryable()
+            //                select new
+            //                {
+            //                    ss.Value.MonthID
+            //                }).Contains(new {MonthID = s.Value.MonthID})
+            //    select new
+            //    {
+            //        s.Value
+            //    }).Concat
+            //    (
+            //        from sss in _sellouts.AsCacheQueryable()
+            //        select new
+            //        {
+            //            sss.Value
+            //        });
+
+            //var q = (/*from so in _sellouts.AsCacheQueryable()*/
+            //         from sp in _salePoints.AsCacheQueryable()
+            //    from c in _contractors.AsCacheQueryable()
+            //        where /*so.Value.ContractorID == c.Value.ID && */sp.Value.DistributorID == c.Value.DistributorID
+            //    select c);
+            ////.Union(_sellouts.AsCacheQueryable()).Except(
+            ////from so in _sellouts.AsCacheQueryable()
+            ////from sp in _salePoints.AsCacheQueryable()
+            ////from c in _contractors.AsCacheQueryable()
+            ////where so.Value.ContractorID != c.Value.ID && sp.Value.DistributorID == c.Value.DistributorID
+            ////select so);
+
+            ////var q = _sellouts.AsCacheQueryable().Join(_contractors.AsCacheQueryable(), =>)
+            //var cnt = q.Count();
+
+var q = new SqlQuery("SalePoint", "from SalePoint, \"contractors\".Contractor as c where SalePoint.RegionID > 30 AND SalePoint.DistributorID=c.DistributorID")
+{
+    EnableDistributedJoins = true
+};
+            //var q = new SqlQuery("SalePoint", "from SalePoint sp,  \"dotnet_cache_query_contractor\".Contractor c where sp.RegionID > 30 AND sp.DistributorID=c.DistributorID");
+
+            var r = _salePoints.Query(q);
+            var cnt = r.Count();
+            Console.WriteLine($"{cnt} records in {sw.Elapsed}");
+        }
+
+        private static void PrintStats()
+        {
+            Console.WriteLine($"Salepoints:{_salePoints.GetLocalSize()}/{_salePoints.GetSize()}," +
+                              $"Payments:{_payments.GetLocalSize()}/{_payments.GetSize()}," +
+                              $"PaymentRequestss:{_paymentRequests.GetLocalSize()}/{_paymentRequests.GetSize()}," +
+                              $"Sellouts:{_sellouts.GetLocalSize()}/{_sellouts.GetSize()}," +
+                              $"Contractors:{_contractors.GetLocalSize()}/{_contractors.GetSize()}," +
+                              $"Months:{_months.GetLocalSize()}/{_months.GetSize()}");
+        }
+
+        private static void CreateCaches(IIgnite ignite)
+        {
+            _salePoints = ignite.GetOrCreateCache<int, SalePoint>(new CacheConfiguration("salePoints", typeof(SalePoint))
+            {
+                Name = "salePoints",
+                CacheStoreFactory = new EntityFrameworkCacheStoreFactory<SalePoint, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
+        c => c.SalePoints, p => p.ID, (p, o) => p.ID = (int)o),
+                ReadThrough = true,
+                WriteThrough = true,
+                KeepBinaryInStore = false   // Store works with concrete classes.
+            });
+            _months = ignite.GetOrCreateCache<int, Month>(new CacheConfiguration("months", typeof(Month))
+            {
+                Name = "months",
+                CacheStoreFactory = new EntityFrameworkCacheStoreFactory<Month, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
+                    c => c.Months, p => p.ID, (p, o) => p.ID = (int)o),
+                ReadThrough = true,
+                WriteThrough = true,
+                KeepBinaryInStore = false   // Store works with concrete classes.
+            });
+            _paymentRequests = ignite.GetOrCreateCache<int, PaymentRequest>(new CacheConfiguration("paymentRequests", typeof(PaymentRequest))
+            {
+                Name = "paymentRequests",
+                CacheStoreFactory = new EntityFrameworkCacheStoreFactory<PaymentRequest, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
+                    c => c.PaymentRequests, p => p.ID, (p, o) => p.ID = (int)o),
+                ReadThrough = true,
+                WriteThrough = true,
+                KeepBinaryInStore = false   // Store works with concrete classes.
+            });
+            _payments = ignite.GetOrCreateCache<int, Payment>(new CacheConfiguration("payments", typeof(Payment))
+            {
+                Name = "payments",
+                CacheStoreFactory = new EntityFrameworkCacheStoreFactory<Payment, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
+                    c => c.Payments, p => p.ID, (p, o) => p.ID = (int)o),
+                ReadThrough = true,
+                WriteThrough = true,
+                KeepBinaryInStore = false   // Store works with concrete classes.
+            });
+            _sellouts = ignite.GetOrCreateCache<int, SellOut>(new CacheConfiguration("sellouts", typeof(SellOut))
+            {
+                Name = "sellouts",
+                CacheStoreFactory = new EntityFrameworkCacheStoreFactory<SellOut, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
+                    c => c.SellOuts, p => p.ID, (p, o) => p.ID = (int)o),
+                ReadThrough = true,
+                WriteThrough = true,
+                KeepBinaryInStore = false   // Store works with concrete classes.
+            });
+            _contractors = ignite.GetOrCreateCache<int, Contractor>(new CacheConfiguration("contractors", typeof(Contractor))
+            {
+                Name = "contractors",
+                CacheStoreFactory = new EntityFrameworkCacheStoreFactory<Contractor, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
+                    c => c.Contractors, p => p.ID, (p, o) => p.ID = (int)o),
+                ReadThrough = true,
+                WriteThrough = true,
+                KeepBinaryInStore = false   // Store works with concrete classes.
+            });
+        }
+
+        private static void LoadCaches()
+        {
+            var sw = Stopwatch.StartNew();
+            _salePoints.LoadCache(null);
+            Console.WriteLine($"{_salePoints.GetSize()} salePoints loaded in {sw.Elapsed}");
+            sw.Restart();
+            _months.LoadCache(null);
+            Console.WriteLine($"{_months.GetSize()} months loaded in {sw.Elapsed}");
+            sw.Restart();
+            _paymentRequests.LoadCache(null);
+            Console.WriteLine($"{_paymentRequests.GetSize()} paymentRequests loaded in {sw.Elapsed}");
+            sw.Restart();
+            _payments.LoadCache(null);
+            Console.WriteLine($"{_payments.GetSize()} payments loaded in {sw.Elapsed}");
+            sw.Restart();
+            _sellouts.LoadCache(null);
+            Console.WriteLine($"{_sellouts.GetSize()} sellouts loaded in {sw.Elapsed}");
+            sw.Restart();
+            _contractors.LoadCache(null);
+            Console.WriteLine($"{_contractors.GetSize()} contractors loaded in {sw.Elapsed}");
         }
 
         private static void DisplayData(ICache<int, Post> posts, ICache<int, Blog> blogs)
@@ -81,37 +246,131 @@ namespace IgniteEFCacheStore
             Console.WriteLine(">>> End list.\n");
         }
 
-        private static void InitializeDb()
-        {
-            using (var ctx = new BloggingContext())
-            {
-                // ReSharper disable once AssignNullToNotNullAttribute
-                var dataSource = Path.GetFullPath(ctx.Database.Connection.DataSource);
 
-                if (ctx.Database.CreateIfNotExists())
-                {
-                    var blog = new Blog
-                    {
-                        Name = "Ignite Blog",
-                        Posts = new List<Post>
-                        {
-                            new Post
-                            {
-                                Title = "Getting Started With Ignite.NET",
-                                Content = "Refer to https://ptupitsyn.github.io/Getting-Started-With-Apache-Ignite-Net/"
-                            }
-                        }
-                    };
+        private static string horribleQuery = @"SELECT z.*,
+	   InvestPercentFact	=	IIF (ISNULL(z.SelloutSum, 0) != 0 ,
+								CAST( 100 * (z.InvestSumBefore + z.InvestSumAfter) 							 							 
+								/ 
+								z.SelloutSum AS DECIMAL(18,2))
+								
+								, NULL)
+FROM 
+(
+	SELECT	z.MonthID, z.ContractorID, 
+			InvestSumBefore		= SUM (InvestSumBefore),
+			InvestSumAfter		= SUM (InvestSumAfter),
+			SelloutSum			= SUM	(
+											IIF ( SellOutSum IS NOT NULL, SelloutSum, SelloutSumTnSp)
+										)
+	FROM 
+	(
+		SELECT	z.MonthID, z.ContractorID,
+				InvestSumBefore		= z.InvestSumBefore,
+				InvestSumAfter		= z.InvestSumAfter,
+				SelloutSum			= z.Sellout,
+				SelloutSumTnSp		= SUM (
+											IIF (sosptn.ValueFact IS NULL, sosptn.ValuePlan, 
+											IIF (z.ConMonthID < z.MonthID, sosptn.ValueFact, sosptn.ValuePlan))
+										  )		
+		FROM	
+		(			
+			SELECT	z.MonthID, z.ConMonthID, z.ContractorID, 
+					InvestSumBefore		= InvestSumBefore,
+					InvestSumAfter		= InvestSumAfter,
+					Sellout				= IIF (so.ValueFact IS NULL, so.ValuePlan, 
+												IIF (z.ConMonthID < z.MonthID, so.ValueFact, so.ValuePlan))
+											  		
+			FROM	
+			(
+				SELECT	MonthID					= m.ID,
+						ConMonthID				= pp.MonthID,
+						ContractorID			= pp.ContractorID,
 
-                    ctx.Blogs.Add(blog);
+						InvestSumBefore		= SUM (IIF (rm.ActualDate < DATEADD (MONTH, -1, m.ActualDate),
+													CASE 
+														WHEN pp.ContractStatusID IN (4, 8, 7, 6) THEN
+															--для контрактов, со статусами (Действующий/Закрытый/Аннулированный/В процессе аннулирования)
+															CASE 
+																WHEN p.Value IS NOT NULL AND p.Value > pr.Value THEN p.Value
+																WHEN pr.Value IS NOT NULL AND pr.PaymentRequestStatusID != 11 THEN pr.Value
+																WHEN pr.PaymentRequestStatusID = 11 AND p.Value IS NOT NULL THEN p.Value --TIM-1633 если заявка в статусе Закрыта и есть выплаты, то выплаты
+																WHEN pr.PaymentRequestStatusID = 11 AND p.Value IS NULL THEN 0 --TIM-1633 если заявка в статусе Закрыта и нет выплат, то 0
+																--WHEN pp.PaymentPlanValue IS NOT NULL THEN pp.PaymentPlanValue
+																ELSE  0
+															END
+														WHEN pp.ContractStatusID IN (1, 3, 2) THEN
+															--для контрактов, со статусами (Черновик/Требуют доработки/В процессе подтверждения)																
+															ISNULL (pp.PaymentPlanValue, 0)
+														ELSE 0
+													END, 																
+													0)),
+						InvestSumAfter		= SUM (IIF(DATEADD (MONTH, -1, m.ActualDate) <= rm.ActualDate, pp.PaymentPlanValue,  0))
+				FROM	dbo.Month m
+				INNER JOIN	
+				(
+					SELECT	pp.ContractorID, pp.ActualYear
+					FROM	dbo.PaymentPlanRealView pp WITH (NOEXPAND) 										
+					GROUP BY pp.ContractorID, pp.ActualYear
+				) cry ON m.ActualYear = cry.ActualYear
+				INNER JOIN dbo.Contractor cr ON cr.ID = cry.ContractorID
+				CROSS APPLY 
+				(	 
+					SELECT ipp.MonthID, ipp.ContractorID, ipp.ContractStatusID, ipp.PaymentPlanID, ipp.PaymentPlanValue
+					FROM dbo.PaymentPlanRealView ipp WITH (NOEXPAND) 
+					WHERE ipp.ContractorID = cry.ContractorID AND 
+					ipp.ContractID IN 
+							(	
+								SELECT ContractID 
+								FROM dbo.PaymentPlanRealView iipp WITH (NOEXPAND)
+								WHERE iipp.ActualYear = m.ActualYear AND iipp.ContractorID = cr.ID
+							)
 
-                    Console.WriteLine("Database created at {0} with {1} entities.", dataSource, ctx.SaveChanges());
-                }
-                else
-                {
-                    Console.WriteLine("Database already exists at {0}.", dataSource);
-                }
-            }
-        }
+					UNION ALL
+
+					SELECT ipp.MonthID, cr.ID ContractorID, ipp.ContractStatusID, ipp.PaymentPlanID, ipp.PaymentPlanValue
+					FROM dbo.SalePoint sp 
+					INNER JOIN dbo.Contractor tnspcr ON tnspcr.SalePointID = sp.ID
+					INNER JOIN dbo.PaymentPlanRealView ipp WITH (NOEXPAND) ON ipp.ContractorID = tnspcr.ID
+					WHERE sp.TradenetID = cr.TradenetID AND cr.TradeNetID IS NOT NULL AND 
+							ipp.ContractID IN 
+							(
+								SELECT ContractID 
+								FROM dbo.PaymentPlanRealView iipp WITH (NOEXPAND)
+								WHERE iipp.ActualYear = m.ActualYear AND iipp.ContractorID = tnspcr.ID
+							)	
+				) pp
+				INNER JOIN dbo.Month rm ON pp.MonthID = rm.ID
+				LEFT JOIN dbo.PaymentRequest pr ON pr.PaymentPlanID = pp.PaymentPlanID AND pr.PaymentRequestStatusID != 10
+				LEFT JOIN	(
+								SELECT	PaymentRequestID	= ip.PaymentRequestID, 
+										Value				= SUM (ip.Value)
+								FROM	dbo.Payment ip
+								GROUP BY ip.PaymentRequestID
+							) p ON p.PaymentRequestID = pr.ID
+				GROUP BY m.ID, pp.MonthID, pp.ContractorID
+			) z
+			OUTER APPLY 
+			(
+				SELECT ValuePlan, ValueFact 
+				FROM dbo.SellOut  
+				WHERE z.ContractorID = ContractorID AND MonthID = z.ConMonthID
+			) so			
+		) z
+		OUTER APPLY 
+		(
+			SELECT 
+			ValuePlan		= so.ValuePlan, 
+			ValueFact		= so.ValueFact 
+			FROM dbo.SellOut so
+			INNER JOIN Contractor cr ON cr.ID = so.ContractorID
+			INNER JOIN SalePoint SP ON SP.ID = cr.SalePointID
+			INNER JOIN Contractor tncr ON tncr.ID = z.ContractorID AND tncr.TradenetID IS NOT NULL AND SP.TradeNetID = tncr.TradenetID
+			WHERE so.MonthID = z.ConMonthID 		
+		) sosptn
+		GROUP BY z.MonthID, z.ConMonthID, z.ContractorID, z.InvestSumBefore, z.InvestSumAfter, z.Sellout
+	) z 	
+	GROUP BY z.MonthID, z.ContractorID
+) z
+";
     }
 }
