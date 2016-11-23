@@ -9,7 +9,9 @@ using Apache.Ignite.Core.Binary;
 using Apache.Ignite.Core.Cache;
 using Apache.Ignite.Core.Cache.Configuration;
 using Apache.Ignite.Core.Cache.Query;
+using Apache.Ignite.Core.Compute;
 using Apache.Ignite.Linq;
+using Tim.DataAccess;
 
 namespace IgniteEFCacheStore
 {
@@ -21,6 +23,7 @@ namespace IgniteEFCacheStore
         private static ICache<int, Payment> _payments;
         private static ICache<int, SellOut> _sellouts;
         private static ICache<int, Contractor> _contractors;
+        private static ICache<int, object> _all;
         private static IIgnite _ignite;
 
 
@@ -37,7 +40,7 @@ namespace IgniteEFCacheStore
             Console.WriteLine(td.Contractors.Count());
 
 
-            Environment.SetEnvironmentVariable("IGNITE_H2_DEBUG_CONSOLE", "true");
+            //Environment.SetEnvironmentVariable("IGNITE_H2_DEBUG_CONSOLE", "true");
             var cfg = new IgniteConfiguration
             {
                 BinaryConfiguration = new BinaryConfiguration(typeof(SalePoint), typeof(Month),
@@ -69,13 +72,39 @@ namespace IgniteEFCacheStore
                 var s = _sellouts.AsCacheQueryable().Where(p => p.Value.MonthID == 44);
                 Console.WriteLine(s.Count());
 
+                var sw = Stopwatch.StartNew();
+                var rnd = new Random();
+                for (int i = 0; i < 1000; i++)
+                {
+                    int id = rnd.Next(1, 100000);
+                    var z = td.SellOuts.FirstOrDefault(ss => ss.ID == id);
+                }
+                Console.WriteLine($"DB rnd read in {sw.Elapsed}");
+
+                sw.Restart();
+                for (int i = 0; i < 1000; i++)
+                {
+                    int id = rnd.Next(1, 100000);
+                    SellOut so;
+                    var z = _sellouts.TryGet(id, out so);
+                }
+                Console.WriteLine($"Ignite rnd read by index in {sw.Elapsed}");
+
+                //sw.Restart();
+                //for (int i = 0; i < 1000; i++)
+                //{
+                //    int id = rnd.Next(1, 100000);
+                //    var z = _sellouts.FirstOrDefault(ss => ss.Key == id);
+                //}
+                //Console.WriteLine($"Ignite rnd read in {sw.Elapsed}");
+
                 //var q = new SqlFieldsQuery(horribleQuery);
                 //var f = _months.QueryFields(q);
                 //f.GetAll();
                 Console.WriteLine("Press Q to quit, L to reload caches, R to run query, any key to display local stats");
                 while (true)
                 {
-                    switch (Console.ReadKey().KeyChar)
+                    switch (Console.ReadKey(true).KeyChar)
                     {
                         case 'q':
                             return;
@@ -115,11 +144,11 @@ namespace IgniteEFCacheStore
             //            sss.Value
             //        });
 
-            //var q = (/*from so in _sellouts.AsCacheQueryable()*/
-            //         from sp in _salePoints.AsCacheQueryable()
-            //    from c in _contractors.AsCacheQueryable()
-            //        where /*so.Value.ContractorID == c.Value.ID && */sp.Value.DistributorID == c.Value.DistributorID
-            //    select c);
+            var q = (/*from so in _sellouts.AsCacheQueryable()*/
+                     from sp in _salePoints.AsCacheQueryable(new QueryOptions { EnableDistributedJoins = true })
+                     from c in _contractors.AsCacheQueryable(new QueryOptions { EnableDistributedJoins = true })
+                     where sp.Key == c.Value.SalePointID
+                     select sp);
             ////.Union(_sellouts.AsCacheQueryable()).Except(
             ////from so in _sellouts.AsCacheQueryable()
             ////from sp in _salePoints.AsCacheQueryable()
@@ -130,14 +159,19 @@ namespace IgniteEFCacheStore
             ////var q = _sellouts.AsCacheQueryable().Join(_contractors.AsCacheQueryable(), =>)
             //var cnt = q.Count();
 
-var q = new SqlQuery("SalePoint", "from SalePoint, \"contractors\".Contractor as c where SalePoint.RegionID > 30 AND SalePoint.DistributorID=c.DistributorID")
-{
-    EnableDistributedJoins = true
-};
-            //var q = new SqlQuery("SalePoint", "from SalePoint sp,  \"dotnet_cache_query_contractor\".Contractor c where sp.RegionID > 30 AND sp.DistributorID=c.DistributorID");
+            //            var q = new SqlQuery("SalePoint", "from SalePoint, \"contractors\".Contractor as c where SalePoint.ID=c.ID")
+            //{
+            //    EnableDistributedJoins = true
+            //};
 
-            var r = _salePoints.Query(q);
-            var cnt = r.Count();
+            var qq = new SqlFieldsQuery("select SalePoint.ID from SalePoint INNER JOIN \"contractors\".Contractor as c ON SalePoint._key=c.SalepointID")
+            {
+                EnableDistributedJoins = true
+            };
+
+            //var r = _salePoints.Query(q);
+            //var r = _salePoints.QueryFields(qq);
+            var cnt = q.Count();
             Console.WriteLine($"{cnt} records in {sw.Elapsed}");
         }
 
@@ -207,6 +241,15 @@ var q = new SqlQuery("SalePoint", "from SalePoint, \"contractors\".Contractor as
                 WriteThrough = true,
                 KeepBinaryInStore = false   // Store works with concrete classes.
             });
+            //_all = ignite.GetOrCreateCache<int, object>(new CacheConfiguration 
+            //{
+            //    Name = "contractors",
+            //    CacheStoreFactory = new EntityFrameworkCacheStoreFactory<object, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
+            //        c => c.SellOuts , p => p.ID, (p, o) => p.ID = (int)o),
+            //    ReadThrough = true,
+            //    WriteThrough = true,
+            //    KeepBinaryInStore = false   // Store works with concrete classes.
+            //});
         }
 
         private static void LoadCaches()
