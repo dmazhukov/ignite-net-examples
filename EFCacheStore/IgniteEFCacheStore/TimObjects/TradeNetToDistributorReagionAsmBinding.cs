@@ -7,6 +7,9 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Tim.DataAccess
 {
     using System;
@@ -14,7 +17,9 @@ namespace Tim.DataAccess
     
     public partial class TradeNetToDistributorReagionAsmBinding
     {
+        [Key, Column(Order=0)]
         public int DistributorRegionAsmID { get; set; }
+        [Key, Column(Order=1)]
         public int TradeNetID { get; set; }
         public System.DateTime LastChangeDateTime { get; set; }
     

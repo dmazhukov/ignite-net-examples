@@ -7,6 +7,9 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Tim.DataAccess
 {
     using System;
@@ -14,6 +17,7 @@ namespace Tim.DataAccess
     
     public partial class ContractTotalOutlay
     {
+        [Key, Column(Order=0), ForeignKey("Contract")]
         public int ContractID { get; set; }
         public decimal TotalOutlaySum { get; set; }
         public System.DateTime LastChangedateTime { get; set; }

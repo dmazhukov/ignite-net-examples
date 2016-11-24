@@ -7,6 +7,9 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Tim.DataAccess
 {
     using System;
@@ -14,6 +17,7 @@ namespace Tim.DataAccess
     
     public partial class SalePointFact
     {
+        [Key, Column(Order=0), ForeignKey("SalePoint")]
         public int SalePointID { get; set; }
         public int AverageSkuCount { get; set; }
         public decimal DoorsCountOfHeinekenFridge { get; set; }

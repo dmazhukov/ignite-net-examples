@@ -7,6 +7,9 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Tim.DataAccess
 {
     using System;
@@ -14,7 +17,9 @@ namespace Tim.DataAccess
     
     public partial class RoleExpand
     {
+        [Key, Column(Order=0)]
         public int RoleID { get; set; }
+        [Key, Column(Order=1)]
         public int ParentRoleID { get; set; }
         public int Lvl { get; set; }
     

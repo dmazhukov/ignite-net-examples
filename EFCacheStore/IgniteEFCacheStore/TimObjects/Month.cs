@@ -45,7 +45,7 @@ namespace Tim.DataAccess
         public virtual ICollection<ContractMonthConditionMatchingCache> ContractMonthConditionMatchingCache { get; set; }
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly")]
         public virtual ICollection<InvestPercentFact> InvestPercentFact { get; set; }
-        public virtual Version Version { get; set; }
+        //public virtual Version Version { get; set; }
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly")]
         public virtual ICollection<SellOut> SellOut { get; set; }
     }

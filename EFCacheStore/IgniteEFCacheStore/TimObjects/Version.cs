@@ -7,6 +7,8 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Tim.DataAccess
 {
     using System;
@@ -38,6 +40,7 @@ namespace Tim.DataAccess
         public virtual ICollection<BudgetData> BudgetData { get; set; }
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly")]
         public virtual ICollection<ImportFileBudget> ImportFileBudget { get; set; }
-        public virtual Month Month { get; set; }
+        //[ForeignKey("Month")]
+        //public virtual Month Month { get; set; }
     }
 }

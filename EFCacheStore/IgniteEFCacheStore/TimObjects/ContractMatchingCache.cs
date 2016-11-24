@@ -7,6 +7,9 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Tim.DataAccess
 {
     using System;
@@ -14,6 +17,7 @@ namespace Tim.DataAccess
     
     public partial class ContractMatchingCache
     {
+        [Key, ForeignKey("Contract")]
         public int ContractID { get; set; }
         public bool IsAuthorized { get; set; }
         public Nullable<bool> HasApprovedWithInTime { get; set; }
