@@ -52,7 +52,7 @@ namespace IgniteEFCacheStore
             // Load everything from DB to Ignite
             using (var ctx = _getContext())
             {
-                foreach (var entity in _getDbSet(ctx))
+                foreach (var entity in _getDbSet(ctx).Take(100000))
                 {
                     act(_getKey(entity), entity);
                 }
@@ -162,24 +162,10 @@ namespace IgniteEFCacheStore
 
         private readonly Delegate _setKey;
 
-        //private readonly Func<TContext, IDbSet<TEntity>> _getDbSet;
-        //private readonly Func<TEntity, object> _getKey;
-        //private readonly Action<TEntity, object> _setKey;
 
         public DynamicEntityFrameworkCacheStoreFactory(Type entityType)
         {
             _entityType = entityType;
-            //if (getContext == null)
-            //    throw new ArgumentNullException(nameof(getContext));
-
-            //if (getDbSet == null)
-            //    throw new ArgumentNullException(nameof(getDbSet));
-
-            //if (getKey == null)
-            //    throw new ArgumentNullException(nameof(getKey));
-
-            //if (setKey == null)
-            //    throw new ArgumentNullException(nameof(setKey));
 
             _getContext = () => new TContext() { Configuration = { ProxyCreationEnabled = false }};
             var ti = typeof(IDbSet<>).MakeGenericType(entityType);

@@ -13,6 +13,7 @@ using Apache.Ignite.Core.Cache.Configuration;
 using Apache.Ignite.Core.Cache.Query;
 using Apache.Ignite.Core.Compute;
 using Apache.Ignite.Linq;
+using Remotion.Linq.Clauses;
 using Tim.DataAccess;
 using Tim.DataAccess.Abstract;
 
@@ -36,13 +37,15 @@ namespace IgniteEFCacheStore
 
 
 
-            var td = new TimDbContext();
+            var td = new TimDbContext() {Configuration = { ProxyCreationEnabled = false}};
             Console.WriteLine(td.SalePoint.Count());
             Console.WriteLine(td.Month.Count());
             Console.WriteLine(td.PaymentRequest.Count());
             Console.WriteLine(td.Payment.Count());
             Console.WriteLine(td.SellOut.Count());
             Console.WriteLine(td.Contractor.Count());
+
+            var arr = td.ContractMonth.Take(10).ToArray();
 
 
             //Environment.SetEnvironmentVariable("IGNITE_H2_DEBUG_CONSOLE", "true");
@@ -118,7 +121,7 @@ namespace IgniteEFCacheStore
                             LoadCaches();
                             break;
                         case 'r':
-                            RunQuery();
+                            RunQuery2();
                             break;
                         default:
                             PrintStats();
@@ -126,6 +129,26 @@ namespace IgniteEFCacheStore
                     }
                 }
             }
+        }
+        private static void RunQuery2()
+        {
+            var sw = Stopwatch.StartNew();
+
+            var cms = GetCache<ContractMonth>().AsCacheQueryable(new QueryOptions { EnableDistributedJoins = true });
+            var ms = GetCache<Month>().AsCacheQueryable(new QueryOptions { EnableDistributedJoins = true });
+            var q = //from cm in cms
+                    from m in ms
+                    //where cm.Value.MonthID == m.Value.ID 
+                    where m.Value.CreationDate==DateTime.UtcNow
+                    //where m.Value.ActualYear.HasValue && m.Value.ActualYear == 2016
+                    //where cm.Value.MonthID == 26
+                    select m.Value;
+
+            Console.WriteLine($"Executing SQL: {(q as ICacheQueryable).GetFieldsQuery().Sql}");
+
+            var cnt = q.Count();
+            Console.WriteLine($"{cnt} records in {sw.Elapsed}");
+            var arr = q.Take(10).ToArray();
         }
 
         private static void RunQuery()
@@ -195,14 +218,13 @@ namespace IgniteEFCacheStore
 
         private static ICache<int, T> GetCache<T>()
         {
-            return (ICache<int, T>) _caches[typeof (T)];
+            return (ICache<int, T>)_caches[typeof(T)];
         }
 
         private static void LoadCache(Type t)
         {
             var cache = _caches[t];
-            cache.GetType().GetMethod("LoadCache").Invoke(cache, new object[] {null, null});
-            //cache.GetType().GetMethod("LoadCache").Invoke(cache, new object[] {null});
+            cache.GetType().GetMethod("LoadCache").Invoke(cache, new object[] { null, null });
         }
 
         private static void CreateCaches(IIgnite ignite)
@@ -220,15 +242,23 @@ namespace IgniteEFCacheStore
                         CacheStoreFactory = new DynamicEntityFrameworkCacheStoreFactory<TimDbContext>(t),
                         ReadThrough = true,
                         WriteThrough = true,
-                        KeepBinaryInStore = false // Store works with concrete classes.
+                        KeepBinaryInStore = false, // Store works with concrete classes.
+                        QueryEntities = new []
+                        {
+                            new QueryEntity
+                            {
+                                KeyType = typeof(int),
+                                ValueType = t,
+                                Fields = t.GetProperties().Select(p=>new QueryField(p.Name,p.PropertyType)).ToArray(),
+                                Indexes = t.GetProperties().Where(p=>p.Name.ToLower().EndsWith("id")).Select(p=>new QueryIndex(p.Name)).ToArray()
+                            }
+                        }
                     }
                 };
+
                 var cache = gm.Invoke(ignite, param);
                 _caches[t] = cache;
             }
-
-            var sps = GetCache<SalePoint>();
-            sps.LoadCache(null);
 
             _salePoints = ignite.GetOrCreateCache<int, SalePoint>(new CacheConfiguration("salePoints", typeof(SalePoint))
             {
@@ -293,7 +323,7 @@ namespace IgniteEFCacheStore
             foreach (var type in GetTimTypes())
             {
                 LoadCache(type);
-                Console.WriteLine($"{_caches[type].GetType().GetMethod("GetSize").Invoke(_caches[type], new object[] {null})} {type.Name}s loaded in {sw.Elapsed}");
+                Console.WriteLine($"{_caches[type].GetType().GetMethod("GetSize").Invoke(_caches[type], new object[] { null })} {type.Name}s loaded in {sw.Elapsed}");
                 sw.Restart();
             }
             //_salePoints.LoadCache(null);
@@ -317,137 +347,11 @@ namespace IgniteEFCacheStore
 
         private static Type[] GetTimTypes()
         {
-            return typeof(Tim_DB_Entities).Assembly.GetTypes().Where(t => t.IsPublic && t.IsClass && !t.IsAbstract
-            && !t.Name.StartsWith("Asp") && !t.Name.EndsWith("View") && !t.Name.EndsWith("Tim_DB_Entities")
-            && !t.Name.EndsWith("Repository")).ToArray();
+            //return typeof(Tim_DB_Entities).Assembly.GetTypes().Where(t => t.IsPublic && t.IsClass && !t.IsAbstract
+            //&& !t.Name.StartsWith("Asp") && !t.Name.EndsWith("View") && !t.Name.EndsWith("Tim_DB_Entities")
+            //&& !t.Name.EndsWith("Repository")).ToArray();
+            return new Type[] {typeof(Contractor),typeof(Month),typeof(Payment),typeof(PaymentRequest),typeof(SalePoint),
+                typeof(SellOut),typeof(Contract),typeof(ContractMonth),typeof(PaymentPlan)};
         }
-
-
-
-        private static string horribleQuery = @"SELECT z.*,
-	   InvestPercentFact	=	IIF (ISNULL(z.SelloutSum, 0) != 0 ,
-								CAST( 100 * (z.InvestSumBefore + z.InvestSumAfter) 							 							 
-								/ 
-								z.SelloutSum AS DECIMAL(18,2))
-								
-								, NULL)
-FROM 
-(
-	SELECT	z.MonthID, z.ContractorID, 
-			InvestSumBefore		= SUM (InvestSumBefore),
-			InvestSumAfter		= SUM (InvestSumAfter),
-			SelloutSum			= SUM	(
-											IIF ( SellOutSum IS NOT NULL, SelloutSum, SelloutSumTnSp)
-										)
-	FROM 
-	(
-		SELECT	z.MonthID, z.ContractorID,
-				InvestSumBefore		= z.InvestSumBefore,
-				InvestSumAfter		= z.InvestSumAfter,
-				SelloutSum			= z.Sellout,
-				SelloutSumTnSp		= SUM (
-											IIF (sosptn.ValueFact IS NULL, sosptn.ValuePlan, 
-											IIF (z.ConMonthID < z.MonthID, sosptn.ValueFact, sosptn.ValuePlan))
-										  )		
-		FROM	
-		(			
-			SELECT	z.MonthID, z.ConMonthID, z.ContractorID, 
-					InvestSumBefore		= InvestSumBefore,
-					InvestSumAfter		= InvestSumAfter,
-					Sellout				= IIF (so.ValueFact IS NULL, so.ValuePlan, 
-												IIF (z.ConMonthID < z.MonthID, so.ValueFact, so.ValuePlan))
-											  		
-			FROM	
-			(
-				SELECT	MonthID					= m.ID,
-						ConMonthID				= pp.MonthID,
-						ContractorID			= pp.ContractorID,
-
-						InvestSumBefore		= SUM (IIF (rm.ActualDate < DATEADD (MONTH, -1, m.ActualDate),
-													CASE 
-														WHEN pp.ContractStatusID IN (4, 8, 7, 6) THEN
-															--для контрактов, со статусами (Действующий/Закрытый/Аннулированный/В процессе аннулирования)
-															CASE 
-																WHEN p.Value IS NOT NULL AND p.Value > pr.Value THEN p.Value
-																WHEN pr.Value IS NOT NULL AND pr.PaymentRequestStatusID != 11 THEN pr.Value
-																WHEN pr.PaymentRequestStatusID = 11 AND p.Value IS NOT NULL THEN p.Value --TIM-1633 если заявка в статусе Закрыта и есть выплаты, то выплаты
-																WHEN pr.PaymentRequestStatusID = 11 AND p.Value IS NULL THEN 0 --TIM-1633 если заявка в статусе Закрыта и нет выплат, то 0
-																--WHEN pp.PaymentPlanValue IS NOT NULL THEN pp.PaymentPlanValue
-																ELSE  0
-															END
-														WHEN pp.ContractStatusID IN (1, 3, 2) THEN
-															--для контрактов, со статусами (Черновик/Требуют доработки/В процессе подтверждения)																
-															ISNULL (pp.PaymentPlanValue, 0)
-														ELSE 0
-													END, 																
-													0)),
-						InvestSumAfter		= SUM (IIF(DATEADD (MONTH, -1, m.ActualDate) <= rm.ActualDate, pp.PaymentPlanValue,  0))
-				FROM	dbo.Month m
-				INNER JOIN	
-				(
-					SELECT	pp.ContractorID, pp.ActualYear
-					FROM	dbo.PaymentPlanRealView pp WITH (NOEXPAND) 										
-					GROUP BY pp.ContractorID, pp.ActualYear
-				) cry ON m.ActualYear = cry.ActualYear
-				INNER JOIN dbo.Contractor cr ON cr.ID = cry.ContractorID
-				CROSS APPLY 
-				(	 
-					SELECT ipp.MonthID, ipp.ContractorID, ipp.ContractStatusID, ipp.PaymentPlanID, ipp.PaymentPlanValue
-					FROM dbo.PaymentPlanRealView ipp WITH (NOEXPAND) 
-					WHERE ipp.ContractorID = cry.ContractorID AND 
-					ipp.ContractID IN 
-							(	
-								SELECT ContractID 
-								FROM dbo.PaymentPlanRealView iipp WITH (NOEXPAND)
-								WHERE iipp.ActualYear = m.ActualYear AND iipp.ContractorID = cr.ID
-							)
-
-					UNION ALL
-
-					SELECT ipp.MonthID, cr.ID ContractorID, ipp.ContractStatusID, ipp.PaymentPlanID, ipp.PaymentPlanValue
-					FROM dbo.SalePoint sp 
-					INNER JOIN dbo.Contractor tnspcr ON tnspcr.SalePointID = sp.ID
-					INNER JOIN dbo.PaymentPlanRealView ipp WITH (NOEXPAND) ON ipp.ContractorID = tnspcr.ID
-					WHERE sp.TradenetID = cr.TradenetID AND cr.TradeNetID IS NOT NULL AND 
-							ipp.ContractID IN 
-							(
-								SELECT ContractID 
-								FROM dbo.PaymentPlanRealView iipp WITH (NOEXPAND)
-								WHERE iipp.ActualYear = m.ActualYear AND iipp.ContractorID = tnspcr.ID
-							)	
-				) pp
-				INNER JOIN dbo.Month rm ON pp.MonthID = rm.ID
-				LEFT JOIN dbo.PaymentRequest pr ON pr.PaymentPlanID = pp.PaymentPlanID AND pr.PaymentRequestStatusID != 10
-				LEFT JOIN	(
-								SELECT	PaymentRequestID	= ip.PaymentRequestID, 
-										Value				= SUM (ip.Value)
-								FROM	dbo.Payment ip
-								GROUP BY ip.PaymentRequestID
-							) p ON p.PaymentRequestID = pr.ID
-				GROUP BY m.ID, pp.MonthID, pp.ContractorID
-			) z
-			OUTER APPLY 
-			(
-				SELECT ValuePlan, ValueFact 
-				FROM dbo.SellOut  
-				WHERE z.ContractorID = ContractorID AND MonthID = z.ConMonthID
-			) so			
-		) z
-		OUTER APPLY 
-		(
-			SELECT 
-			ValuePlan		= so.ValuePlan, 
-			ValueFact		= so.ValueFact 
-			FROM dbo.SellOut so
-			INNER JOIN Contractor cr ON cr.ID = so.ContractorID
-			INNER JOIN SalePoint SP ON SP.ID = cr.SalePointID
-			INNER JOIN Contractor tncr ON tncr.ID = z.ContractorID AND tncr.TradenetID IS NOT NULL AND SP.TradeNetID = tncr.TradenetID
-			WHERE so.MonthID = z.ConMonthID 		
-		) sosptn
-		GROUP BY z.MonthID, z.ConMonthID, z.ContractorID, z.InvestSumBefore, z.InvestSumAfter, z.Sellout
-	) z 	
-	GROUP BY z.MonthID, z.ContractorID
-) z
-";
     }
 }
