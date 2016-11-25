@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.Entity;
 using System.Data.Entity.Core.Common.CommandTrees;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Apache.Ignite.Core;
 using Apache.Ignite.Core.Binary;
 using Apache.Ignite.Core.Cache;
@@ -12,6 +14,7 @@ using Apache.Ignite.Core.Cache.Query;
 using Apache.Ignite.Core.Compute;
 using Apache.Ignite.Linq;
 using Tim.DataAccess;
+using Tim.DataAccess.Abstract;
 
 namespace IgniteEFCacheStore
 {
@@ -31,21 +34,24 @@ namespace IgniteEFCacheStore
         {
             //InitializeDb();
 
+
+
             var td = new TimDbContext();
-            Console.WriteLine(td.SalePoints.Count());
-            Console.WriteLine(td.Months.Count());
-            Console.WriteLine(td.PaymentRequests.Count());
-            Console.WriteLine(td.Payments.Count());
-            Console.WriteLine(td.SellOuts.Count());
-            Console.WriteLine(td.Contractors.Count());
+            Console.WriteLine(td.SalePoint.Count());
+            Console.WriteLine(td.Month.Count());
+            Console.WriteLine(td.PaymentRequest.Count());
+            Console.WriteLine(td.Payment.Count());
+            Console.WriteLine(td.SellOut.Count());
+            Console.WriteLine(td.Contractor.Count());
 
 
             //Environment.SetEnvironmentVariable("IGNITE_H2_DEBUG_CONSOLE", "true");
             var cfg = new IgniteConfiguration
             {
-                BinaryConfiguration = new BinaryConfiguration(typeof(SalePoint), typeof(Month),
-                typeof(Payment), typeof(PaymentRequest), typeof(SellOut), typeof(Contractor)),
+                //BinaryConfiguration = new BinaryConfiguration(typeof(SalePoint), typeof(Month),
+                //typeof(Payment), typeof(PaymentRequest), typeof(SellOut), typeof(Contractor)),
                 //Localhost = "127.0.0.1",
+                BinaryConfiguration = new BinaryConfiguration(GetTimTypes()),
                 GridName = "timtest"
             };
             //using (var ignite = Ignition.StartFromApplicationConfiguration())
@@ -67,26 +73,26 @@ namespace IgniteEFCacheStore
                     LoadCaches();
                 }
 
-                var c = _salePoints.AsCacheQueryable().Where(p => p.Value.RegionID == 193);
-                Console.WriteLine(c.Count());
-                var s = _sellouts.AsCacheQueryable().Where(p => p.Value.MonthID == 44);
-                Console.WriteLine(s.Count());
+                //var c = _salePoints.AsCacheQueryable().Where(p => p.Value.RegionID == 193);
+                //Console.WriteLine(c.Count());
+                //var s = _sellouts.AsCacheQueryable().Where(p => p.Value.MonthID == 44);
+                //Console.WriteLine(s.Count());
 
                 var sw = Stopwatch.StartNew();
                 var rnd = new Random();
-                for (int i = 0; i < 1000; i++)
-                {
-                    int id = rnd.Next(1, 100000);
-                    var z = td.SellOuts.FirstOrDefault(ss => ss.ID == id);
-                }
-                Console.WriteLine($"DB rnd read in {sw.Elapsed}");
+                //for (int i = 0; i < 1000; i++)
+                //{
+                //    int id = rnd.Next(1, 100000);
+                //    var z = td.SellOut.FirstOrDefault(ss => ss.ID == id);
+                //}
+                //Console.WriteLine($"DB rnd read in {sw.Elapsed}");
 
                 sw.Restart();
                 for (int i = 0; i < 1000; i++)
                 {
                     int id = rnd.Next(1, 100000);
-                    SellOut so;
-                    var z = _sellouts.TryGet(id, out so);
+                    Contractor so;
+                    var z = _contractors.TryGet(id, out so);
                 }
                 Console.WriteLine($"Ignite rnd read by index in {sw.Elapsed}");
 
@@ -185,13 +191,43 @@ namespace IgniteEFCacheStore
                               $"Months:{_months.GetLocalSize()}/{_months.GetSize()}");
         }
 
+        private static Dictionary<Type, object> _caches = new Dictionary<Type, object>();
+
+        private static ICache<int, T> GetCache<T>()
+        {
+            return (ICache<int, T>) _caches[typeof (T)];
+        }
+
         private static void CreateCaches(IIgnite ignite)
         {
+            foreach (var t in GetTimTypes())
+            {
+                var ms = typeof(IIgnite).GetMethods().Where(m => m.Name == "GetOrCreateCache").ToArray();
+                var method = typeof(IIgnite).GetMethods().FirstOrDefault(m => m.Name == "GetOrCreateCache"
+               && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(CacheConfiguration));
+                var gm = method.MakeGenericMethod(typeof(int), t);
+                var param = new object[]
+                {
+                    new CacheConfiguration(t.Name, t)
+                    {
+                        CacheStoreFactory = new DynamicEntityFrameworkCacheStoreFactory<TimDbContext>(t),
+                        ReadThrough = true,
+                        WriteThrough = true,
+                        KeepBinaryInStore = false // Store works with concrete classes.
+                    }
+                };
+                var cache = gm.Invoke(ignite, param);
+                _caches[t] = cache;
+            }
+
+            var sps = GetCache<SalePoint>();
+            sps.LoadCache(null);
+
             _salePoints = ignite.GetOrCreateCache<int, SalePoint>(new CacheConfiguration("salePoints", typeof(SalePoint))
             {
                 Name = "salePoints",
                 CacheStoreFactory = new EntityFrameworkCacheStoreFactory<SalePoint, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-        c => c.SalePoints, p => p.ID, (p, o) => p.ID = (int)o),
+        c => c.SalePoint, p => p.ID, (p, o) => p.ID = (int)o),
                 ReadThrough = true,
                 WriteThrough = true,
                 KeepBinaryInStore = false   // Store works with concrete classes.
@@ -200,7 +236,7 @@ namespace IgniteEFCacheStore
             {
                 Name = "months",
                 CacheStoreFactory = new EntityFrameworkCacheStoreFactory<Month, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-                    c => c.Months, p => p.ID, (p, o) => p.ID = (int)o),
+                    c => c.Month, p => p.ID, (p, o) => p.ID = (int)o),
                 ReadThrough = true,
                 WriteThrough = true,
                 KeepBinaryInStore = false   // Store works with concrete classes.
@@ -209,7 +245,7 @@ namespace IgniteEFCacheStore
             {
                 Name = "paymentRequests",
                 CacheStoreFactory = new EntityFrameworkCacheStoreFactory<PaymentRequest, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-                    c => c.PaymentRequests, p => p.ID, (p, o) => p.ID = (int)o),
+                    c => c.PaymentRequest, p => p.ID, (p, o) => p.ID = (int)o),
                 ReadThrough = true,
                 WriteThrough = true,
                 KeepBinaryInStore = false   // Store works with concrete classes.
@@ -218,7 +254,7 @@ namespace IgniteEFCacheStore
             {
                 Name = "payments",
                 CacheStoreFactory = new EntityFrameworkCacheStoreFactory<Payment, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-                    c => c.Payments, p => p.ID, (p, o) => p.ID = (int)o),
+                    c => c.Payment, p => p.ID, (p, o) => p.ID = (int)o),
                 ReadThrough = true,
                 WriteThrough = true,
                 KeepBinaryInStore = false   // Store works with concrete classes.
@@ -227,7 +263,7 @@ namespace IgniteEFCacheStore
             {
                 Name = "sellouts",
                 CacheStoreFactory = new EntityFrameworkCacheStoreFactory<SellOut, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-                    c => c.SellOuts, p => p.ID, (p, o) => p.ID = (int)o),
+                    c => c.SellOut, p => p.ID, (p, o) => p.ID = (int)o),
                 ReadThrough = true,
                 WriteThrough = true,
                 KeepBinaryInStore = false   // Store works with concrete classes.
@@ -236,7 +272,7 @@ namespace IgniteEFCacheStore
             {
                 Name = "contractors",
                 CacheStoreFactory = new EntityFrameworkCacheStoreFactory<Contractor, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-                    c => c.Contractors, p => p.ID, (p, o) => p.ID = (int)o),
+                    c => c.Contractor, p => p.ID, (p, o) => p.ID = (int)o),
                 ReadThrough = true,
                 WriteThrough = true,
                 KeepBinaryInStore = false   // Store works with concrete classes.
@@ -274,20 +310,13 @@ namespace IgniteEFCacheStore
             Console.WriteLine($"{_contractors.GetSize()} contractors loaded in {sw.Elapsed}");
         }
 
-        private static void DisplayData(ICache<int, Post> posts, ICache<int, Blog> blogs)
+        private static Type[] GetTimTypes()
         {
-            Console.WriteLine("\n>>> List of all posts:");
-
-            foreach (var post in posts) // Cache iterator does not go to store.
-            {
-                Console.WriteLine("Retrieving blog with id {0}...", post.Value.BlogId);
-                var blog = blogs[post.Value.BlogId]; // Retrieving by key goes to store.
-
-                Console.WriteLine(">>> Post '{0}' in blog '{1}'", post.Value.Title, blog.Name);
-            }
-
-            Console.WriteLine(">>> End list.\n");
+            return typeof(Tim_DB_Entities).Assembly.GetTypes().Where(t => t.IsPublic && t.IsClass && !t.IsAbstract
+            && !t.Name.StartsWith("Asp") && !t.Name.EndsWith("View") && !t.Name.EndsWith("Tim_DB_Entities")
+            && !t.Name.EndsWith("Repository")).ToArray();
         }
+
 
 
         private static string horribleQuery = @"SELECT z.*,

@@ -3,8 +3,10 @@ using System.Collections;
 using System.Data.Entity;
 using System.Data.Entity.Migrations;
 using System.Linq;
+using System.Reflection;
 using Apache.Ignite.Core.Cache.Store;
 using Apache.Ignite.Core.Common;
+using Tim.DataAccess;
 
 namespace IgniteEFCacheStore
 {
@@ -12,7 +14,7 @@ namespace IgniteEFCacheStore
     /// Generic EF cache store.
     /// </summary>
     public class EntityFrameworkCacheStore<TEntity, TContext> : ICacheStore
-        where TEntity : class, new() where TContext : DbContext
+        where TEntity : class, new() where TContext : Tim_DB_ContextWrapper
     {
         private readonly Func<TContext> _getContext;
 
@@ -148,8 +150,60 @@ namespace IgniteEFCacheStore
     }
 
     [Serializable]
+    public class DynamicEntityFrameworkCacheStoreFactory<TContext> : IFactory<ICacheStore>
+        where TContext : Tim_DB_ContextWrapper, new()
+    {
+        private readonly Type _entityType;
+        private readonly Func<TContext> _getContext;
+
+        private readonly Delegate _getDbSet;
+
+        private readonly Delegate _getKey;
+
+        private readonly Delegate _setKey;
+
+        //private readonly Func<TContext, IDbSet<TEntity>> _getDbSet;
+        //private readonly Func<TEntity, object> _getKey;
+        //private readonly Action<TEntity, object> _setKey;
+
+        public DynamicEntityFrameworkCacheStoreFactory(Type entityType)
+        {
+            _entityType = entityType;
+            //if (getContext == null)
+            //    throw new ArgumentNullException(nameof(getContext));
+
+            //if (getDbSet == null)
+            //    throw new ArgumentNullException(nameof(getDbSet));
+
+            //if (getKey == null)
+            //    throw new ArgumentNullException(nameof(getKey));
+
+            //if (setKey == null)
+            //    throw new ArgumentNullException(nameof(setKey));
+
+            _getContext = () => new TContext() { Configuration = { ProxyCreationEnabled = false }};
+            var ti = typeof(IDbSet<>).MakeGenericType(entityType);
+            var getDbSetMethod = typeof(TimDbContext).GetMethod("GetDbSet").MakeGenericMethod(entityType);
+            var getDbSetFunc = typeof(Func<,>).MakeGenericType(typeof(TContext), ti);
+            _getDbSet = Delegate.CreateDelegate(getDbSetFunc, getDbSetMethod);
+
+            var getKeyMethod = typeof(TimDbContext).GetMethod("GetKey").MakeGenericMethod(entityType);
+            var getKeyFunc = typeof(Func<,>).MakeGenericType(entityType, typeof(object));
+            _getKey = Delegate.CreateDelegate(getKeyFunc, getKeyMethod);
+
+            var setKeyMethod = typeof(TimDbContext).GetMethod("SetKey").MakeGenericMethod(entityType);
+            var setKeyAction = typeof(Action<,>).MakeGenericType(entityType, typeof(object));
+            _setKey = Delegate.CreateDelegate(setKeyAction, setKeyMethod);
+        }
+        public ICacheStore CreateInstance()
+        {
+            var gc = typeof(EntityFrameworkCacheStore<,>).MakeGenericType(_entityType, typeof(TContext));
+            return (ICacheStore)Activator.CreateInstance(gc, _getContext, _getDbSet, _getKey, _setKey);
+        }
+    }
+    [Serializable]
     public class EntityFrameworkCacheStoreFactory<TEntity, TContext> : IFactory<ICacheStore>
-        where TEntity : class, new() where TContext : DbContext
+        where TEntity : class, new() where TContext : Tim_DB_ContextWrapper
     {
         private readonly Func<TContext> _getContext;
 

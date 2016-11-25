@@ -4,39 +4,72 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Entity;
 using System.Data.Entity.ModelConfiguration.Conventions;
 using System.Data.SqlClient;
+using System.Linq;
+using System.Reflection;
 using Apache.Ignite.Core.Cache.Configuration;
 using Tim.DataAccess;
+using Tim.DataAccess.Configuration;
 
 namespace IgniteEFCacheStore
 {
-    public class TimDbContext : DbContext
+    public class TimDbContext : Tim_DB_ContextWrapper
     {
-        public TimDbContext() : base(
-            new SqlConnectionStringBuilder
+        //public TimDbContext() : base(
+        //    new SqlConnectionStringBuilder
+        //    {
+        //        DataSource = "Tim_TEST_AG.spb.local",
+        //        InitialCatalog = "TIM_DB",
+        //        IntegratedSecurity = false,
+        //        UserID = "sa",
+        //        Password = "123QAZwsx/*-"
+        //    }.ConnectionString)
+
+        static TimDbContext()
+        {
+            EfConfiguration.SetConfiguration(new DatabaseConfiguration
             {
-                DataSource = "Tim_TEST_AG.spb.local",
-                InitialCatalog = "TIM_DB",
-                IntegratedSecurity = false,
-                UserID = "sa",
-                Password = "123QAZwsx/*-"
-            }.ConnectionString)
-        {
-            // No-op.
+                ServerName = "Tim_TEST_AG.spb.local",
+                DatabaseName = "TIM_DB",
+                UserName = "sa",
+                Password = "123QAZwsx/*-",
+                MaxAttemptsRecommitTransactionDatabase = 3,
+                RetryRecommitTransactionDatabaseTimeout = 3
+            });
+
         }
-        protected override void OnModelCreating(DbModelBuilder modelBuilder)
+        public TimDbContext()
         {
-            Database.SetInitializer<TimDbContext>(null);
-            modelBuilder.Conventions.Remove<PluralizingTableNameConvention>();
-            base.OnModelCreating(modelBuilder);
         }
 
-        public virtual DbSet<SalePoint> SalePoints { get; set; }
-        public virtual DbSet<PaymentPlanRealView> PaymentPlanRealViews { get; set; }
-        public virtual DbSet<Month> Months { get; set; }
-        public virtual DbSet<SellOut> SellOuts { get; set; }
-        public virtual DbSet<Payment> Payments { get; set; }
-        public virtual DbSet<PaymentRequest> PaymentRequests { get; set; }
-        public virtual DbSet<Contractor> Contractors { get; set; }
+        public static IDbSet<T> GetDbSet<T>(TimDbContext ctx) where T : class
+        {
+            return (IDbSet<T>) typeof (TimDbContext).GetProperties().FirstOrDefault(p => p.Name == typeof(T).Name).GetValue(ctx);
+        }
+
+        public static object GetKey<T>(object entity) where T : class
+        {
+            return null;
+        }
+
+        public static void SetKey<T>(T entity, object key) where T : class
+        {
+            return;
+        }
+
+        //protected override void OnModelCreating(DbModelBuilder modelBuilder)
+        //{
+        //    Database.SetInitializer<TimDbContext>(null);
+        //    modelBuilder.Conventions.Remove<PluralizingTableNameConvention>();
+        //    base.OnModelCreating(modelBuilder);
+        //}
+
+        //public virtual DbSet<SalePoint> SalePoints { get; set; }
+        //public virtual DbSet<PaymentPlanRealView> PaymentPlanRealViews { get; set; }
+        //public virtual DbSet<Month> Months { get; set; }
+        //public virtual DbSet<SellOut> SellOuts { get; set; }
+        //public virtual DbSet<Payment> Payments { get; set; }
+        //public virtual DbSet<PaymentRequest> PaymentRequests { get; set; }
+        //public virtual DbSet<Contractor> Contractors { get; set; }
     }
 /*
     [Table("PaymentPlanRealView")]

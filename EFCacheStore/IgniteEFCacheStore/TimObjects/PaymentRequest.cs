@@ -7,6 +7,8 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Tim.DataAccess
 {
     using System;
@@ -41,8 +43,10 @@ namespace Tim.DataAccess
         public virtual PaymentRequestStatus PaymentRequestStatus { get; set; }
         public virtual PaymentRequestType PaymentRequestType { get; set; }
         public virtual Sku Sku { get; set; }
-        public virtual User User { get; set; }
-        public virtual User User1 { get; set; }
+        //[Column("CreationUserID")]
+        //public virtual User User { get; set; }
+        //[Column("LastChangeUserID")]
+        //public virtual User User1 { get; set; }
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly")]
         public virtual ICollection<PaymentRequestStatusHistory> PaymentRequestStatusHistory { get; set; }
     }

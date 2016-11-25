@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+VisualStudioVersion = 14.0.25123.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IgniteEFCacheStore", "IgniteEFCacheStore\IgniteEFCacheStore.csproj", "{78D82DDE-DB40-48DA-A0E5-0922F132E8BB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tim.DataAccess", "..\..\timservice\Tim\Tim.DataAccess\Tim.DataAccess.csproj", "{57D13E77-3B66-4158-9BAB-B81C6FB925B2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{78D82DDE-DB40-48DA-A0E5-0922F132E8BB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{78D82DDE-DB40-48DA-A0E5-0922F132E8BB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{78D82DDE-DB40-48DA-A0E5-0922F132E8BB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{57D13E77-3B66-4158-9BAB-B81C6FB925B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57D13E77-3B66-4158-9BAB-B81C6FB925B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57D13E77-3B66-4158-9BAB-B81C6FB925B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57D13E77-3B66-4158-9BAB-B81C6FB925B2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
