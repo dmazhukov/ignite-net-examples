@@ -46,9 +46,10 @@ namespace IgniteEFCacheStore
             return (IDbSet<T>) typeof (TimDbContext).GetProperties().FirstOrDefault(p => p.Name == typeof(T).Name).GetValue(ctx);
         }
 
+        private static int key = int.MinValue;
         public static object GetKey<T>(object entity) where T : class
         {
-            return null;
+            return key++;
         }
 
         public static void SetKey<T>(T entity, object key) where T : class

@@ -87,14 +87,14 @@ namespace IgniteEFCacheStore
                 //}
                 //Console.WriteLine($"DB rnd read in {sw.Elapsed}");
 
-                sw.Restart();
-                for (int i = 0; i < 1000; i++)
-                {
-                    int id = rnd.Next(1, 100000);
-                    Contractor so;
-                    var z = _contractors.TryGet(id, out so);
-                }
-                Console.WriteLine($"Ignite rnd read by index in {sw.Elapsed}");
+                //sw.Restart();
+                //for (int i = 0; i < 1000; i++)
+                //{
+                //    int id = rnd.Next(1, 100000);
+                //    Contractor so;
+                //    var z = _contractors.TryGet(id, out so);
+                //}
+                //Console.WriteLine($"Ignite rnd read by index in {sw.Elapsed}");
 
                 //sw.Restart();
                 //for (int i = 0; i < 1000; i++)
@@ -198,6 +198,13 @@ namespace IgniteEFCacheStore
             return (ICache<int, T>) _caches[typeof (T)];
         }
 
+        private static void LoadCache(Type t)
+        {
+            var cache = _caches[t];
+            cache.GetType().GetMethod("LoadCache").Invoke(cache, new object[] {null, null});
+            //cache.GetType().GetMethod("LoadCache").Invoke(cache, new object[] {null});
+        }
+
         private static void CreateCaches(IIgnite ignite)
         {
             foreach (var t in GetTimTypes())
@@ -277,37 +284,35 @@ namespace IgniteEFCacheStore
                 WriteThrough = true,
                 KeepBinaryInStore = false   // Store works with concrete classes.
             });
-            //_all = ignite.GetOrCreateCache<int, object>(new CacheConfiguration 
-            //{
-            //    Name = "contractors",
-            //    CacheStoreFactory = new EntityFrameworkCacheStoreFactory<object, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-            //        c => c.SellOuts , p => p.ID, (p, o) => p.ID = (int)o),
-            //    ReadThrough = true,
-            //    WriteThrough = true,
-            //    KeepBinaryInStore = false   // Store works with concrete classes.
-            //});
+
         }
 
         private static void LoadCaches()
         {
             var sw = Stopwatch.StartNew();
-            _salePoints.LoadCache(null);
-            Console.WriteLine($"{_salePoints.GetSize()} salePoints loaded in {sw.Elapsed}");
-            sw.Restart();
-            _months.LoadCache(null);
-            Console.WriteLine($"{_months.GetSize()} months loaded in {sw.Elapsed}");
-            sw.Restart();
-            _paymentRequests.LoadCache(null);
-            Console.WriteLine($"{_paymentRequests.GetSize()} paymentRequests loaded in {sw.Elapsed}");
-            sw.Restart();
-            _payments.LoadCache(null);
-            Console.WriteLine($"{_payments.GetSize()} payments loaded in {sw.Elapsed}");
-            sw.Restart();
-            _sellouts.LoadCache(null);
-            Console.WriteLine($"{_sellouts.GetSize()} sellouts loaded in {sw.Elapsed}");
-            sw.Restart();
-            _contractors.LoadCache(null);
-            Console.WriteLine($"{_contractors.GetSize()} contractors loaded in {sw.Elapsed}");
+            foreach (var type in GetTimTypes())
+            {
+                LoadCache(type);
+                Console.WriteLine($"{_caches[type].GetType().GetMethod("GetSize").Invoke(_caches[type], new object[] {null})} {type.Name}s loaded in {sw.Elapsed}");
+                sw.Restart();
+            }
+            //_salePoints.LoadCache(null);
+            //Console.WriteLine($"{_salePoints.GetSize()} salePoints loaded in {sw.Elapsed}");
+            //sw.Restart();
+            //_months.LoadCache(null);
+            //Console.WriteLine($"{_months.GetSize()} months loaded in {sw.Elapsed}");
+            //sw.Restart();
+            //_paymentRequests.LoadCache(null);
+            //Console.WriteLine($"{_paymentRequests.GetSize()} paymentRequests loaded in {sw.Elapsed}");
+            //sw.Restart();
+            //_payments.LoadCache(null);
+            //Console.WriteLine($"{_payments.GetSize()} payments loaded in {sw.Elapsed}");
+            //sw.Restart();
+            //_sellouts.LoadCache(null);
+            //Console.WriteLine($"{_sellouts.GetSize()} sellouts loaded in {sw.Elapsed}");
+            //sw.Restart();
+            //_contractors.LoadCache(null);
+            //Console.WriteLine($"{_contractors.GetSize()} contractors loaded in {sw.Elapsed}");
         }
 
         private static Type[] GetTimTypes()

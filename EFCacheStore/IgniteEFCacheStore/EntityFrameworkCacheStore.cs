@@ -47,7 +47,7 @@ namespace IgniteEFCacheStore
 
         public void LoadCache(Action<object, object> act, params object[] args)
         {
-            Console.WriteLine("{0}.LoadCache() called.", GetType().Name);
+            Console.WriteLine("{0}.LoadCache() for {1} called.", GetType().Name, typeof(TEntity).Name);
 
             // Load everything from DB to Ignite
             using (var ctx = _getContext())
