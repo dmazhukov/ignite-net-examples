@@ -12,6 +12,7 @@
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -34,12 +35,12 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Apache.Ignite.Core, Version=1.7.0.13146, Culture=neutral, PublicKeyToken=a487a7ff0b2aaa4a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Apache.Ignite.1.7.0\lib\net40\Apache.Ignite.Core.dll</HintPath>
+    <Reference Include="Apache.Ignite.Core, Version=1.8.0.1037, Culture=neutral, PublicKeyToken=a487a7ff0b2aaa4a, processorArchitecture=MSIL">
+      <HintPath>..\packages\Apache.Ignite.1.8.0-nightly1037\lib\net40\Apache.Ignite.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Apache.Ignite.Linq, Version=1.7.0.13146, Culture=neutral, PublicKeyToken=a487a7ff0b2aaa4a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Apache.Ignite.Linq.1.7.0\lib\net40\Apache.Ignite.Linq.dll</HintPath>
+    <Reference Include="Apache.Ignite.Linq, Version=1.8.0.1037, Culture=neutral, PublicKeyToken=a487a7ff0b2aaa4a, processorArchitecture=MSIL">
+      <HintPath>..\packages\Apache.Ignite.Linq.1.8.0-nightly1037\lib\net40\Apache.Ignite.Linq.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="EntityFramework, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
@@ -97,7 +98,9 @@
     if not exist "$(TargetDir)amd64" md "$(TargetDir)amd64"
     xcopy /s /y "$(SolutionDir)packages\Microsoft.SqlServer.Compact.4.0.8876.1\NativeBinaries\amd64\*.*" "$(TargetDir)amd64"
 if not exist "$(TargetDir)Libs" md "$(TargetDir)Libs"
-xcopy /s /y "$(SolutionDir)packages\Apache.Ignite.1.7.0\Libs\*.*" "$(TargetDir)Libs"</PostBuildEvent>
+xcopy /s /y "$(SolutionDir)packages\Apache.Ignite.1.7.0\Libs\*.*" "$(TargetDir)Libs"
+if not exist "$(TargetDir)Libs" md "$(TargetDir)Libs"
+xcopy /s /y "$(SolutionDir)packages\Apache.Ignite.1.8.0-nightly1037\Libs\*.*" "$(TargetDir)Libs"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

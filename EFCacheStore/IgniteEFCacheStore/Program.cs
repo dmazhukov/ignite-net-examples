@@ -21,13 +21,6 @@ namespace IgniteEFCacheStore
 {
     public static class Program
     {
-        private static ICache<int, SalePoint> _salePoints;
-        private static ICache<int, Month> _months;
-        private static ICache<int, PaymentRequest> _paymentRequests;
-        private static ICache<int, Payment> _payments;
-        private static ICache<int, SellOut> _sellouts;
-        private static ICache<int, Contractor> _contractors;
-        private static ICache<int, object> _all;
         private static IIgnite _ignite;
 
 
@@ -37,7 +30,7 @@ namespace IgniteEFCacheStore
 
 
 
-            var td = new TimDbContext() {Configuration = { ProxyCreationEnabled = false}};
+            var td = new TimDbContext() { Configuration = { ProxyCreationEnabled = false } };
             Console.WriteLine(td.SalePoint.Count());
             Console.WriteLine(td.Month.Count());
             Console.WriteLine(td.PaymentRequest.Count());
@@ -51,14 +44,17 @@ namespace IgniteEFCacheStore
             //Environment.SetEnvironmentVariable("IGNITE_H2_DEBUG_CONSOLE", "true");
             var cfg = new IgniteConfiguration
             {
-                //BinaryConfiguration = new BinaryConfiguration(typeof(SalePoint), typeof(Month),
-                //typeof(Payment), typeof(PaymentRequest), typeof(SellOut), typeof(Contractor)),
-                //Localhost = "127.0.0.1",
-                BinaryConfiguration = new BinaryConfiguration(GetTimTypes()),
-                GridName = "timtest"
+                BinaryConfiguration = new BinaryConfiguration(GetTimTypes())
+                {
+                    TypeConfigurations = GetTimTypes().Select(
+                    t => new BinaryTypeConfiguration(t)
+                    {
+                        Serializer = new BinaryReflectiveSerializer()
+                    }).ToArray()
+                },
+
+                GridName = "timtest",
             };
-            //using (var ignite = Ignition.StartFromApplicationConfiguration())
-            //using (var ignite = Ignition.TryGetIgnite() ?? Ignition.Start(cfg))
             _ignite = Ignition.TryGetIgnite("timtest");
             bool exists = true;
             if (_ignite == null)
@@ -71,45 +67,11 @@ namespace IgniteEFCacheStore
                 CreateCaches(_ignite);
                 Console.WriteLine("\n>>> Example started\n\n");
 
-                if (_salePoints.GetSize() == 0)
+                if (_caches.All(c => (int)c.Value.GetType().GetMethod("GetSize").Invoke(c.Value, new object[] { null }) == 0))
                 {
                     LoadCaches();
                 }
 
-                //var c = _salePoints.AsCacheQueryable().Where(p => p.Value.RegionID == 193);
-                //Console.WriteLine(c.Count());
-                //var s = _sellouts.AsCacheQueryable().Where(p => p.Value.MonthID == 44);
-                //Console.WriteLine(s.Count());
-
-                var sw = Stopwatch.StartNew();
-                var rnd = new Random();
-                //for (int i = 0; i < 1000; i++)
-                //{
-                //    int id = rnd.Next(1, 100000);
-                //    var z = td.SellOut.FirstOrDefault(ss => ss.ID == id);
-                //}
-                //Console.WriteLine($"DB rnd read in {sw.Elapsed}");
-
-                //sw.Restart();
-                //for (int i = 0; i < 1000; i++)
-                //{
-                //    int id = rnd.Next(1, 100000);
-                //    Contractor so;
-                //    var z = _contractors.TryGet(id, out so);
-                //}
-                //Console.WriteLine($"Ignite rnd read by index in {sw.Elapsed}");
-
-                //sw.Restart();
-                //for (int i = 0; i < 1000; i++)
-                //{
-                //    int id = rnd.Next(1, 100000);
-                //    var z = _sellouts.FirstOrDefault(ss => ss.Key == id);
-                //}
-                //Console.WriteLine($"Ignite rnd read in {sw.Elapsed}");
-
-                //var q = new SqlFieldsQuery(horribleQuery);
-                //var f = _months.QueryFields(q);
-                //f.GetAll();
                 Console.WriteLine("Press Q to quit, L to reload caches, R to run query, any key to display local stats");
                 while (true)
                 {
@@ -136,13 +98,13 @@ namespace IgniteEFCacheStore
 
             var cms = GetCache<ContractMonth>().AsCacheQueryable(new QueryOptions { EnableDistributedJoins = true });
             var ms = GetCache<Month>().AsCacheQueryable(new QueryOptions { EnableDistributedJoins = true });
-            var q = //from cm in cms
+            var q = from cm in cms
                     from m in ms
-                    //where cm.Value.MonthID == m.Value.ID 
-                    where m.Value.CreationDate==DateTime.UtcNow
-                    //where m.Value.ActualYear.HasValue && m.Value.ActualYear == 2016
+                        //where cm.Value.MonthID == m.Value.ID 
+                        //where m.Value.ActualYear == 2016
+                    where m.Value.ID == cm.Value.MonthID && m.Value.ActualYear == 2016
                     //where cm.Value.MonthID == 26
-                    select m.Value;
+                    select cm.Value;
 
             Console.WriteLine($"Executing SQL: {(q as ICacheQueryable).GetFieldsQuery().Sql}");
 
@@ -151,67 +113,10 @@ namespace IgniteEFCacheStore
             var arr = q.Take(10).ToArray();
         }
 
-        private static void RunQuery()
-        {
-            var sw = Stopwatch.StartNew();
-            //var q = (from s in _sellouts.AsCacheQueryable()
-            //    where
-            //        !
-            //            (from ss in _sellouts.AsCacheQueryable()
-            //                select new
-            //                {
-            //                    ss.Value.MonthID
-            //                }).Contains(new {MonthID = s.Value.MonthID})
-            //    select new
-            //    {
-            //        s.Value
-            //    }).Concat
-            //    (
-            //        from sss in _sellouts.AsCacheQueryable()
-            //        select new
-            //        {
-            //            sss.Value
-            //        });
-
-            var q = (/*from so in _sellouts.AsCacheQueryable()*/
-                     from sp in _salePoints.AsCacheQueryable(new QueryOptions { EnableDistributedJoins = true })
-                     from c in _contractors.AsCacheQueryable(new QueryOptions { EnableDistributedJoins = true })
-                     where sp.Key == c.Value.SalePointID
-                     select sp);
-            ////.Union(_sellouts.AsCacheQueryable()).Except(
-            ////from so in _sellouts.AsCacheQueryable()
-            ////from sp in _salePoints.AsCacheQueryable()
-            ////from c in _contractors.AsCacheQueryable()
-            ////where so.Value.ContractorID != c.Value.ID && sp.Value.DistributorID == c.Value.DistributorID
-            ////select so);
-
-            ////var q = _sellouts.AsCacheQueryable().Join(_contractors.AsCacheQueryable(), =>)
-            //var cnt = q.Count();
-
-            //            var q = new SqlQuery("SalePoint", "from SalePoint, \"contractors\".Contractor as c where SalePoint.ID=c.ID")
-            //{
-            //    EnableDistributedJoins = true
-            //};
-
-            var qq = new SqlFieldsQuery("select SalePoint.ID from SalePoint INNER JOIN \"contractors\".Contractor as c ON SalePoint._key=c.SalepointID")
-            {
-                EnableDistributedJoins = true
-            };
-
-            //var r = _salePoints.Query(q);
-            //var r = _salePoints.QueryFields(qq);
-            var cnt = q.Count();
-            Console.WriteLine($"{cnt} records in {sw.Elapsed}");
-        }
-
         private static void PrintStats()
         {
-            Console.WriteLine($"Salepoints:{_salePoints.GetLocalSize()}/{_salePoints.GetSize()}," +
-                              $"Payments:{_payments.GetLocalSize()}/{_payments.GetSize()}," +
-                              $"PaymentRequestss:{_paymentRequests.GetLocalSize()}/{_paymentRequests.GetSize()}," +
-                              $"Sellouts:{_sellouts.GetLocalSize()}/{_sellouts.GetSize()}," +
-                              $"Contractors:{_contractors.GetLocalSize()}/{_contractors.GetSize()}," +
-                              $"Months:{_months.GetLocalSize()}/{_months.GetSize()}");
+            string str = string.Join(",", GetTimTypes().Select(t => $"{t.Name}: {_caches[t].GetType().GetMethod("GetLocalSize").Invoke(_caches[t], new object[] { null })}/{_caches[t].GetType().GetMethod("GetSize").Invoke(_caches[t], new object[] { null })}"));
+            Console.WriteLine(str);
         }
 
         private static Dictionary<Type, object> _caches = new Dictionary<Type, object>();
@@ -231,7 +136,6 @@ namespace IgniteEFCacheStore
         {
             foreach (var t in GetTimTypes())
             {
-                var ms = typeof(IIgnite).GetMethods().Where(m => m.Name == "GetOrCreateCache").ToArray();
                 var method = typeof(IIgnite).GetMethods().FirstOrDefault(m => m.Name == "GetOrCreateCache"
                && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(CacheConfiguration));
                 var gm = method.MakeGenericMethod(typeof(int), t);
@@ -259,62 +163,6 @@ namespace IgniteEFCacheStore
                 var cache = gm.Invoke(ignite, param);
                 _caches[t] = cache;
             }
-
-            _salePoints = ignite.GetOrCreateCache<int, SalePoint>(new CacheConfiguration("salePoints", typeof(SalePoint))
-            {
-                Name = "salePoints",
-                CacheStoreFactory = new EntityFrameworkCacheStoreFactory<SalePoint, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-        c => c.SalePoint, p => p.ID, (p, o) => p.ID = (int)o),
-                ReadThrough = true,
-                WriteThrough = true,
-                KeepBinaryInStore = false   // Store works with concrete classes.
-            });
-            _months = ignite.GetOrCreateCache<int, Month>(new CacheConfiguration("months", typeof(Month))
-            {
-                Name = "months",
-                CacheStoreFactory = new EntityFrameworkCacheStoreFactory<Month, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-                    c => c.Month, p => p.ID, (p, o) => p.ID = (int)o),
-                ReadThrough = true,
-                WriteThrough = true,
-                KeepBinaryInStore = false   // Store works with concrete classes.
-            });
-            _paymentRequests = ignite.GetOrCreateCache<int, PaymentRequest>(new CacheConfiguration("paymentRequests", typeof(PaymentRequest))
-            {
-                Name = "paymentRequests",
-                CacheStoreFactory = new EntityFrameworkCacheStoreFactory<PaymentRequest, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-                    c => c.PaymentRequest, p => p.ID, (p, o) => p.ID = (int)o),
-                ReadThrough = true,
-                WriteThrough = true,
-                KeepBinaryInStore = false   // Store works with concrete classes.
-            });
-            _payments = ignite.GetOrCreateCache<int, Payment>(new CacheConfiguration("payments", typeof(Payment))
-            {
-                Name = "payments",
-                CacheStoreFactory = new EntityFrameworkCacheStoreFactory<Payment, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-                    c => c.Payment, p => p.ID, (p, o) => p.ID = (int)o),
-                ReadThrough = true,
-                WriteThrough = true,
-                KeepBinaryInStore = false   // Store works with concrete classes.
-            });
-            _sellouts = ignite.GetOrCreateCache<int, SellOut>(new CacheConfiguration("sellouts", typeof(SellOut))
-            {
-                Name = "sellouts",
-                CacheStoreFactory = new EntityFrameworkCacheStoreFactory<SellOut, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-                    c => c.SellOut, p => p.ID, (p, o) => p.ID = (int)o),
-                ReadThrough = true,
-                WriteThrough = true,
-                KeepBinaryInStore = false   // Store works with concrete classes.
-            });
-            _contractors = ignite.GetOrCreateCache<int, Contractor>(new CacheConfiguration("contractors", typeof(Contractor))
-            {
-                Name = "contractors",
-                CacheStoreFactory = new EntityFrameworkCacheStoreFactory<Contractor, TimDbContext>(() => new TimDbContext() { Configuration = { ProxyCreationEnabled = false } },
-                    c => c.Contractor, p => p.ID, (p, o) => p.ID = (int)o),
-                ReadThrough = true,
-                WriteThrough = true,
-                KeepBinaryInStore = false   // Store works with concrete classes.
-            });
-
         }
 
         private static void LoadCaches()
@@ -326,23 +174,7 @@ namespace IgniteEFCacheStore
                 Console.WriteLine($"{_caches[type].GetType().GetMethod("GetSize").Invoke(_caches[type], new object[] { null })} {type.Name}s loaded in {sw.Elapsed}");
                 sw.Restart();
             }
-            //_salePoints.LoadCache(null);
-            //Console.WriteLine($"{_salePoints.GetSize()} salePoints loaded in {sw.Elapsed}");
-            //sw.Restart();
-            //_months.LoadCache(null);
-            //Console.WriteLine($"{_months.GetSize()} months loaded in {sw.Elapsed}");
-            //sw.Restart();
-            //_paymentRequests.LoadCache(null);
-            //Console.WriteLine($"{_paymentRequests.GetSize()} paymentRequests loaded in {sw.Elapsed}");
-            //sw.Restart();
-            //_payments.LoadCache(null);
-            //Console.WriteLine($"{_payments.GetSize()} payments loaded in {sw.Elapsed}");
-            //sw.Restart();
-            //_sellouts.LoadCache(null);
-            //Console.WriteLine($"{_sellouts.GetSize()} sellouts loaded in {sw.Elapsed}");
-            //sw.Restart();
-            //_contractors.LoadCache(null);
-            //Console.WriteLine($"{_contractors.GetSize()} contractors loaded in {sw.Elapsed}");
+
         }
 
         private static Type[] GetTimTypes()
