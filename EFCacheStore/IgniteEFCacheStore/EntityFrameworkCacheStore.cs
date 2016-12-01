@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Data.Entity;
 using System.Data.Entity.Migrations;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using Apache.Ignite.Core.Cache.Store;
@@ -10,10 +11,11 @@ using Tim.DataAccess;
 
 namespace IgniteEFCacheStore
 {
+
     /// <summary>
     /// Generic EF cache store.
     /// </summary>
-    public class EntityFrameworkCacheStore<TEntity, TContext> : ICacheStore
+    public class EntityFrameworkCacheStore<TEntity, TContext> : CacheStoreAdapter
         where TEntity : class, new() where TContext : Tim_DB_ContextWrapper
     {
         private readonly Func<TContext> _getContext;
@@ -45,21 +47,25 @@ namespace IgniteEFCacheStore
             _setKey = setKey;
         }
 
-        public void LoadCache(Action<object, object> act, params object[] args)
+        public override void LoadCache(Action<object, object> act, params object[] args)
         {
-            Console.WriteLine("{0}.LoadCache() for {1} called.", GetType().Name, typeof(TEntity).Name);
+            var sw = Stopwatch.StartNew();
+            Console.WriteLine("{0}.LoadCache() for {1} called in PID {2}.", GetType().Name, typeof(TEntity).Name, Process.GetCurrentProcess().Id);
 
             // Load everything from DB to Ignite
             using (var ctx = _getContext())
             {
-                foreach (var entity in _getDbSet(ctx).Take(100000))
+                //foreach (var entity in _getDbSet(ctx).Take(1000))
+                Console.WriteLine($"{_getDbSet(ctx).Count()} {typeof(TEntity).Name}s to load");
+                foreach (var entity in _getDbSet(ctx).AsNoTracking())
                 {
                     act(_getKey(entity), entity);
                 }
             }
+            Console.WriteLine("{0}.LoadCache() for {1} took {2}.", GetType().Name, typeof(TEntity).Name, sw.Elapsed);
         }
 
-        public object Load(object key)
+        public override object Load(object key)
         {
             Console.WriteLine("{0}.Load({1}) called.", GetType().Name, key);
 
@@ -69,7 +75,7 @@ namespace IgniteEFCacheStore
             }
         }
 
-        public IDictionary LoadAll(ICollection keys)
+        public override IDictionary LoadAll(ICollection keys)
         {
             Console.WriteLine("{0}.LoadAll({1}) called.", GetType().Name, keys);
 
@@ -77,7 +83,7 @@ namespace IgniteEFCacheStore
             return keys.OfType<object>().ToDictionary(x => x, Load);
         }
 
-        public void Write(object key, object val)
+        public override void Write(object key, object val)
         {
             Console.WriteLine("{0}.Write({1}, {2}) called.", GetType().Name, key, val);
 
@@ -89,7 +95,7 @@ namespace IgniteEFCacheStore
             }
         }
 
-        public void WriteAll(IDictionary entries)
+        public override void WriteAll(IDictionary entries)
         {
             Console.WriteLine("{0}.WriteAll({1}) called.", GetType().Name, entries);
 
@@ -104,7 +110,7 @@ namespace IgniteEFCacheStore
             }
         }
 
-        public void Delete(object key)
+        public override void Delete(object key)
         {
             Console.WriteLine("{0}.Delete({1}) called.", GetType().Name, key);
 
@@ -122,7 +128,7 @@ namespace IgniteEFCacheStore
             }
         }
 
-        public void DeleteAll(ICollection keys)
+        public override void DeleteAll(ICollection keys)
         {
             Console.WriteLine("{0}.DeleteAll({1}) called.", GetType().Name, keys);
 
@@ -143,7 +149,7 @@ namespace IgniteEFCacheStore
             }
         }
 
-        public void SessionEnd(bool commit)
+        public override void SessionEnd(bool commit)
         {
             // No-op.
         }
