@@ -28,22 +28,8 @@ namespace IgniteEFCacheStore
 
         public static void Main(string[] args)
         {
-            //InitializeDb();
-
-
-
-            var td = new TimDbContext() { Configuration = { ProxyCreationEnabled = false } };
-            Console.WriteLine(td.SalePoint.Count());
-            Console.WriteLine(td.Month.Count());
-            Console.WriteLine(td.PaymentRequest.Count());
-            Console.WriteLine(td.Payment.Count());
-            Console.WriteLine(td.SellOut.Count());
-            Console.WriteLine(td.Contractor.Count());
-
-            var arr = td.ContractMonth.Take(10).ToArray();
-
-            //Ignition.ClientMode = true;
-            //Environment.SetEnvironmentVariable("IGNITE_H2_DEBUG_CONSOLE", "true");
+      //Ignition.ClientMode = true;
+            Environment.SetEnvironmentVariable("IGNITE_H2_DEBUG_CONSOLE", "true");
             var cfg = new IgniteConfiguration
             {
                 BinaryConfiguration = new BinaryConfiguration(GetTimTypes())
@@ -56,6 +42,22 @@ namespace IgniteEFCacheStore
                 },
 
                 GridName = "timtest",
+                JvmInitialMemoryMb = 25000,
+                JvmMaxMemoryMb = 25000
+                //JvmOptions = new []{
+                //"-server",
+                //"-Xms25g",
+                //"-Xmx25g",
+                //"-XX:+UseParNewGC ",
+                //"-XX:+UseConcMarkSweepGC ",
+                //"-XX:+UseTLAB ",
+                //"-XX:NewSize=128m ",
+                //"-XX:MaxNewSize=128m ",
+                //"-XX:MaxTenuringThreshold=0 ",
+                //"-XX:SurvivorRatio=1024 ",
+                //"-XX:+UseCMSInitiatingOccupancyOnly ",
+                //"-XX:CMSInitiatingOccupancyFraction=60",
+                //"-XX:+DisableExplicitGC"},
             };
             _ignite = Ignition.TryGetIgnite("timtest");
             bool exists = true;
@@ -69,10 +71,10 @@ namespace IgniteEFCacheStore
                 //CreateCaches(_ignite);
                 Console.WriteLine("\n>>> Example started\n\n");
 
-                if (_caches.All(c => (int)c.Value.GetType().GetMethod("GetSize").Invoke(c.Value, new object[] { null }) == 0))
-                {
-                    //LoadCaches();
-                }
+                //if (_caches.All(c => (int)c.Value.GetType().GetMethod("GetSize").Invoke(c.Value, new object[] { null }) == 0))
+                //{
+                //    LoadCaches();
+                //}
 
                 Console.WriteLine("Press Q to quit, L to reload caches, R to run query, any key to display local stats");
                 while (true)
@@ -121,12 +123,15 @@ namespace IgniteEFCacheStore
         {
             var sw = Stopwatch.StartNew();
 
-            var cfs = GetCache<ConditionFact>().AsCacheQueryable(new QueryOptions { EnableDistributedJoins = true });
-            var cs = GetCache<Condition>().AsCacheQueryable(new QueryOptions { EnableDistributedJoins = true });
-            var q = from cf in cfs
-                    from c in cs
-                    where c.Value.ID == cf.Value.ConditionID
-                    select c.Value.Name;
+            //var cfs = GetCache<ConditionFact>().AsCacheQueryable(new QueryOptions { EnableDistributedJoins = true });
+            //var cs = GetCache<Condition>().AsCacheQueryable(new QueryOptions { EnableDistributedJoins = true });
+            //var q = from cf in cfs
+            //        from c in cs
+            //        where c.Value.ID == cf.Value.ConditionID
+            //        select c.Value.Name;
+
+            var q = from c in GetCache<Contract>().AsCacheQueryable()
+                    select c.Value;
 
             Console.WriteLine($"Executing SQL: {(q as ICacheQueryable).GetFieldsQuery().Sql}");
 
@@ -140,7 +145,6 @@ namespace IgniteEFCacheStore
             string str = string.Join(",", _ignite.GetCacheNames()
                  .Select(c => _ignite.GetCache<object, object>(c))
                  .Select(c => $"{c.Name}: {c.GetLocalSize()}/{c.GetSize()}"));
-            //string str = string.Join(",", GetTimTypes().Where(t => _caches.ContainsKey(t)).Select(t => $"{t.Name}: {_caches[t].GetType().GetMethod("GetLocalSize").Invoke(_caches[t], new object[] { null })}/{_caches[t].GetType().GetMethod("GetSize").Invoke(_caches[t], new object[] { null })}"));
             Console.WriteLine(str);
         }
 
@@ -156,44 +160,6 @@ namespace IgniteEFCacheStore
         {
             object cache = GetOrCreateCache(t);
             cache.GetType().GetMethod("LoadCache").Invoke(cache, new object[] { null, null });
-        }
-
-        private static int GetCacheSize(Type t)
-        {
-            return (int)_caches[t].GetType().GetMethod("GetSize").Invoke(_caches[t], new object[] { null });
-        }
-
-        private static void CreateCaches(IIgnite ignite)
-        {
-            foreach (var t in GetTimTypes())
-            {
-                var method = typeof(IIgnite).GetMethods().FirstOrDefault(m => m.Name == "GetOrCreateCache"
-               && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(CacheConfiguration));
-                var gm = method.MakeGenericMethod(typeof(int), t);
-                var param = new object[]
-                {
-                    new CacheConfiguration(t.Name, t)
-                    {
-                        CacheStoreFactory = new DynamicEntityFrameworkCacheStoreFactory<TimDbContext>(t),
-                        ReadThrough = true,
-                        WriteThrough = true,
-                        KeepBinaryInStore = false, // Store works with concrete classes.
-                        QueryEntities = new []
-                        {
-                            new QueryEntity
-                            {
-                                KeyType = typeof(int),
-                                ValueType = t,
-                                Fields = t.GetProperties().Select(p=>new QueryField(p.Name,p.PropertyType)).ToArray(),
-                                Indexes = t.GetProperties().Where(p=>p.Name.ToLower().EndsWith("id")).Select(p=>new QueryIndex(p.Name)).ToArray()
-                            }
-                        }
-                    }
-                };
-
-                var cache = gm.Invoke(ignite, param);
-                _caches[t] = cache;
-            }
         }
 
         private static object GetOrCreateCache(Type t)
@@ -221,6 +187,7 @@ namespace IgniteEFCacheStore
                                 ValueType = t,
                                 Fields = t.GetProperties().Select(p=>new QueryField(p.Name,p.PropertyType)).ToArray(),
                                 Indexes = t.GetProperties().Where(p=>p.Name.ToLower().EndsWith("id")).Select(p=>new QueryIndex(p.Name)).ToArray()
+                                //Indexes = new []{new QueryIndex (t.GetProperties().Where(p => p.Name.ToLower().EndsWith("id")).Select(p =>p.Name).ToArray()) { Name = "all_idx", IndexType = QueryIndexType.Sorted } }
                             }
                         }
                     }
@@ -272,6 +239,14 @@ namespace IgniteEFCacheStore
         private static void LoadCaches()
         {
             var swTotal = Stopwatch.StartNew();
+            //Parallel.ForEach(GetTimTypes(), new ParallelOptions {MaxDegreeOfParallelism = 5}, type =>
+            //{
+            //    var sw = Stopwatch.StartNew();
+            //    LoadCache(type);
+            //    Console.WriteLine($"{_caches[type].GetType().GetMethod("GetSize").Invoke(_caches[type], new object[] {null})} {type.Name}s loaded in {sw.Elapsed}");
+            //    sw.Restart();
+            //});
+
             var tasks = GetTimTypes().Select(type =>
                   Task.Run(() =>
                   {

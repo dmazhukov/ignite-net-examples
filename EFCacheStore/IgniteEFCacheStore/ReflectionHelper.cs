@@ -35,6 +35,7 @@ namespace IgniteEFCacheStore
                                 ValueType = t,
                                 Fields = t.GetProperties().Select(p=>new QueryField(p.Name,p.PropertyType)).ToArray(),
                                 Indexes = t.GetProperties().Where(p=>p.Name.ToLower().EndsWith("id")).Select(p=>new QueryIndex(p.Name)).ToArray()
+                                //Indexes = new []{new QueryIndex (t.GetProperties().Where(p => p.Name.ToLower().EndsWith("id")).Select(p =>p.Name).ToArray()) { Name = "all_idx", IndexType = QueryIndexType.Sorted } }
                             }
                         }
                     }
@@ -42,7 +43,7 @@ namespace IgniteEFCacheStore
 
             var cache = gm.Invoke(ignite, param);
             Console.WriteLine($"Got cache for {t.Name} with {GetCacheSize(cache)} entries");
-            return  cache;
+            return cache;
         }
 
         public static object GetCache(IIgnite ignite, Type t)
