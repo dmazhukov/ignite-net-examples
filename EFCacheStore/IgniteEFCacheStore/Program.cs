@@ -28,7 +28,7 @@ namespace IgniteEFCacheStore
 
         public static void Main(string[] args)
         {
-      //Ignition.ClientMode = true;
+            Ignition.ClientMode = true;
             Environment.SetEnvironmentVariable("IGNITE_H2_DEBUG_CONSOLE", "true");
             var cfg = new IgniteConfiguration
             {
@@ -42,8 +42,8 @@ namespace IgniteEFCacheStore
                 },
 
                 GridName = "timtest",
-                JvmInitialMemoryMb = 25000,
-                JvmMaxMemoryMb = 25000
+                JvmInitialMemoryMb = Ignition.ClientMode ? IgniteConfiguration.DefaultJvmInitMem : 25000,
+                JvmMaxMemoryMb = Ignition.ClientMode ? IgniteConfiguration.DefaultJvmMaxMem : 25000,
                 //JvmOptions = new []{
                 //"-server",
                 //"-Xms25g",
@@ -88,6 +88,9 @@ namespace IgniteEFCacheStore
                             break;
                         case 'r':
                             RunQuery();
+                            break;
+                        case 's':
+                            RunIgniteStressTest();
                             break;
                         case '\r':
                             break;
@@ -138,6 +141,45 @@ namespace IgniteEFCacheStore
             var cnt = q.Count();
             Console.WriteLine($"{cnt} records in {sw.Elapsed}");
             var arr = q.Take(10).ToArray();
+        }
+
+        private static void RunIgniteStressTest()
+        {
+            var sw = Stopwatch.StartNew();
+            Parallel.ForEach(GetTimTypes(), t =>
+            {
+                var cache = _ignite.GetCache<int, object>(t.Name); ; //GetOrCreateCache(t);
+                var rnd = new Random();
+                var size = ReflectionHelper.GetCacheSize(cache);
+                if (size < 2) return;
+
+                for (int i = 0; i < 1000; i++)
+                {
+                    var key = rnd.Next(1, size - 1);
+                    if (cache.ContainsKey(key))
+                    {
+                        var item = cache[key];
+                    }
+                }
+            });
+            Console.WriteLine($"Ignite stress test finished in {sw.Elapsed}");
+        }
+
+        private static void RunDbStressTest()
+        {
+            var sw = Stopwatch.StartNew();
+            var ctx = new TimDbContext();
+            Parallel.ForEach(GetTimTypes(), t =>
+            {
+                var cache = _ignite.GetCache<int, object>(t.Name); ; //GetOrCreateCache(t);
+                var rnd = new Random();
+                var size = ReflectionHelper.GetCacheSize(cache);
+                for (int i = 0; i < 1000; i++)
+                {
+                    var item = cache[rnd.Next(1, size - 1)];
+                }
+            });
+            Console.WriteLine($"Ignite stress test finished in {sw.Elapsed}");
         }
 
         private static void PrintStats()
