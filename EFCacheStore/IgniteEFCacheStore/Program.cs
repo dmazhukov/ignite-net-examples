@@ -28,7 +28,7 @@ namespace IgniteEFCacheStore
 
         public static void Main(string[] args)
         {
-            Ignition.ClientMode = true;
+            //Ignition.ClientMode = true;
             Environment.SetEnvironmentVariable("IGNITE_H2_DEBUG_CONSOLE", "true");
             var cfg = new IgniteConfiguration
             {
@@ -92,6 +92,9 @@ namespace IgniteEFCacheStore
                         case 's':
                             RunIgniteStressTest();
                             break;
+                        case 'd':
+                            RunDbStressTest();
+                            break;
                         case '\r':
                             break;
                         default:
@@ -145,41 +148,75 @@ namespace IgniteEFCacheStore
 
         private static void RunIgniteStressTest()
         {
+            Console.WriteLine($"Starting Ignite stress test");
             var sw = Stopwatch.StartNew();
+            int counter = 0;
+            //foreach (var t in GetTimTypes())
             Parallel.ForEach(GetTimTypes(), t =>
             {
                 var cache = _ignite.GetCache<int, object>(t.Name); ; //GetOrCreateCache(t);
                 var rnd = new Random();
                 var size = ReflectionHelper.GetCacheSize(cache);
                 if (size < 2) return;
-
+                if (t.GetProperty("ID") == null)
+                    return;
+                if (t.Assembly.GetType($"{t.Name}ComplexPK") != null)
+                {
+                    return;
+                }
                 for (int i = 0; i < 1000; i++)
                 {
                     var key = rnd.Next(1, size - 1);
                     if (cache.ContainsKey(key))
                     {
                         var item = cache[key];
+                        counter++;
                     }
                 }
             });
-            Console.WriteLine($"Ignite stress test finished in {sw.Elapsed}");
+            Console.WriteLine($"Ignite stress test for {counter} items finished in {sw.Elapsed}");
         }
 
         private static void RunDbStressTest()
         {
+            Console.WriteLine($"Starting DB stress test");
             var sw = Stopwatch.StartNew();
-            var ctx = new TimDbContext();
+            int counter = 0;
             Parallel.ForEach(GetTimTypes(), t =>
             {
-                var cache = _ignite.GetCache<int, object>(t.Name); ; //GetOrCreateCache(t);
+                var ctx = new TimDbContext();
+
                 var rnd = new Random();
-                var size = ReflectionHelper.GetCacheSize(cache);
+                var repository = ctx.GetType().GetProperties().FirstOrDefault(p => p.Name == t.Name).GetValue(ctx);
+                var cache = _ignite.GetCache<int, object>(t.Name); ; //GetOrCreateCache(t);
+                    var size = ReflectionHelper.GetCacheSize(cache);
+                if (size < 2) return;
+                if (t.GetProperty("ID") == null)
+                    return;
+
+                if (t.Assembly.GetType($"{t.Name}ComplexPK") != null)
+                {
+                    return;
+                }
+
                 for (int i = 0; i < 1000; i++)
                 {
-                    var item = cache[rnd.Next(1, size - 1)];
+                    var key = rnd.Next(1, size - 1);
+                    try
+                    {
+                    var item = repository.GetType().GetMethod("Find").Invoke(repository, new object[] { new object[] { key } });
+                    if (item != null)
+                        counter++;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Exception in {t.Name}");
+                        return;
+                    }
+
                 }
             });
-            Console.WriteLine($"Ignite stress test finished in {sw.Elapsed}");
+            Console.WriteLine($"DB stress test for {counter} items finished in {sw.Elapsed}");
         }
 
         private static void PrintStats()
@@ -221,6 +258,7 @@ namespace IgniteEFCacheStore
                         ReadThrough = true,
                         WriteThrough = true,
                         KeepBinaryInStore = false, // Store works with concrete classes.
+                        CacheMode = CacheMode.Replicated,
                         QueryEntities = new []
                         {
                             new QueryEntity
