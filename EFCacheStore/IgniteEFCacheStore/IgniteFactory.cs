@@ -8,6 +8,7 @@ using Apache.Ignite.Core.Binary;
 using Apache.Ignite.Core.Cache;
 using Apache.Ignite.Core.Cache.Configuration;
 using Apache.Ignite.Core.Compute;
+using IgniteEFCacheStore.Actions;
 
 namespace IgniteEFCacheStore
 {
@@ -139,34 +140,6 @@ namespace IgniteEFCacheStore
             await IgniteFactory.GetIgnite().GetCompute().RunAsync(funcs);
             Console.WriteLine($"LoadCachesDistributed took {sw.Elapsed}");
             await IgniteFactory.GetIgnite().GetCompute().BroadcastAsync(new PrintMessageAction { Message = $"LoadCachesDistributed took {sw.Elapsed}" });
-        }
-
-        [Serializable]
-        private class LoadCacheAction : IComputeAction
-        {
-            public Type Type { get; set; }
-            public void Invoke()
-            {
-                Console.WriteLine($"Loading cache {Type.Name}");
-                var ignite = Ignition.TryGetIgnite("timtest");
-                ReflectionHelper.GetOrCreateCache(ignite, Type);
-                var sw = Stopwatch.StartNew();
-                //var cache = ignite.GetCache<object, object>(Type.Name);
-                //cache.LoadCache(null);
-                var cache = ReflectionHelper.GetCache(ignite, Type);
-                ReflectionHelper.LoadCache(cache);
-                Console.WriteLine($"{ReflectionHelper.GetCacheSize(cache)} {Type.Name}s loaded in {sw.Elapsed} in PID {Process.GetCurrentProcess().Id}");
-            }
-        }
-
-        [Serializable]
-        private class PrintMessageAction : IComputeAction
-        {
-            public string Message { get; set; }
-            public void Invoke()
-            {
-                Console.WriteLine(Message);
-            }
         }
     }
 }
