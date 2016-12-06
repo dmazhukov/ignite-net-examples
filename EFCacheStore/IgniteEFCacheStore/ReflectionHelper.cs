@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Apache.Ignite.Core;
 using Apache.Ignite.Core.Cache;
 using Apache.Ignite.Core.Cache.Configuration;
+using Tim.DataAccess;
 
 namespace IgniteEFCacheStore
 {
@@ -68,6 +69,18 @@ namespace IgniteEFCacheStore
         {
             Console.WriteLine($"LoadCache for {cache.GetType().Name} called in PID {Process.GetCurrentProcess().Id}");
             cache.GetType().GetMethod("LoadCache").Invoke(cache, new object[] { null, null });
+        }
+
+        public static Type[] GetTimTypes()
+        {
+            return typeof(Tim_DB_Entities).Assembly.GetTypes().Where(t => t.IsPublic && t.IsClass && !t.IsAbstract
+            && !t.Name.StartsWith("Asp") && !t.Name.EndsWith("View") && !t.Name.EndsWith("Tim_DB_Entities")
+            && !t.Name.EndsWith("Repository") && !t.Name.EndsWith("ComplexPK") && !t.Name.EndsWith("Wrapper")
+            && !t.Name.EndsWith("Configuration") && !t.Name.EndsWith("_test") && !t.Name.EndsWith("Extension")
+            && !t.Name.EndsWith("LogWorker") && !t.Name.EndsWith("Factory")).ToArray();
+            //return new Type[] { typeof(Month) };
+            //return new Type[] {typeof(Contractor),typeof(Month),typeof(Payment),typeof(PaymentRequest),typeof(SalePoint),
+            //    typeof(SellOut),typeof(Contract),typeof(ContractMonth),typeof(PaymentPlan)};
         }
     }
 }

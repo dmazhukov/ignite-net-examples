@@ -71,6 +71,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="EntityFrameworkCacheStore.cs" />
+    <Compile Include="IgniteFactory.cs" />
     <Compile Include="PostCacheStore.cs" />
     <Compile Include="BlogCacheStore.cs" />
     <Compile Include="BloggingContext.cs" />
