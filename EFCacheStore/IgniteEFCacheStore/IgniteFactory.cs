@@ -9,6 +9,8 @@ using Apache.Ignite.Core.Cache;
 using Apache.Ignite.Core.Cache.Configuration;
 using Apache.Ignite.Core.Compute;
 using IgniteEFCacheStore.Actions;
+using IgniteEFCacheStore.Serializers;
+using Tim.DataAccess;
 
 namespace IgniteEFCacheStore
 {
@@ -69,11 +71,32 @@ namespace IgniteEFCacheStore
                 BinaryConfiguration = new BinaryConfiguration(ReflectionHelper.GetTimTypes())
                 {
                     TypeConfigurations = ReflectionHelper.GetTimTypes().Select(
-                    t => new BinaryTypeConfiguration(t)
+                    t =>
                     {
-                        Serializer = new BinaryReflectiveSerializer()
+                        if (t == typeof(Month))
+                        {
+                            return new BinaryTypeConfiguration(typeof(Month))
+                            {
+                                Serializer = new MonthSerializer()
+                            };
+                        }
+
+                        if (t == typeof(Contract))
+                        {
+                            return new BinaryTypeConfiguration(typeof(Contract))
+                            {
+                                Serializer = new ContractSerializer()
+                            };
+                        }
+
+                        return new BinaryTypeConfiguration(t)
+                        {
+                            Serializer = new BinaryReflectiveSerializer()
+                        };
                     }).ToArray(),
                 },
+
+
 
                 GridName = "timtest",
                 JvmInitialMemoryMb = Ignition.ClientMode ? IgniteConfiguration.DefaultJvmInitMem : 25000,
@@ -93,6 +116,14 @@ namespace IgniteEFCacheStore
                 //"-XX:CMSInitiatingOccupancyFraction=60",
                 //"-XX:+DisableExplicitGC"},
             };
+        }
+
+        public static void CreateLocalCaches()
+        {
+            //foreach (var t in ReflectionHelper.GetTimTypes())
+            //{
+            //    _caches[t] = GetOrCreateCache(t);
+            //}
         }
 
         public static object GetOrCreateCache(Type t)
@@ -121,7 +152,6 @@ namespace IgniteEFCacheStore
                                 ValueType = t,
                                 Fields = t.GetProperties().Select(p=>new QueryField(p.Name,p.PropertyType)).ToArray(),
                                 Indexes = t.GetProperties().Where(p=>p.Name.ToLower().EndsWith("id")).Select(p=>new QueryIndex(p.Name)).ToArray()
-                                //Indexes = new []{new QueryIndex (t.GetProperties().Where(p => p.Name.ToLower().EndsWith("id")).Select(p =>p.Name).ToArray()) { Name = "all_idx", IndexType = QueryIndexType.Sorted } }
                             }
                         }
                     }
