@@ -35,12 +35,12 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Apache.Ignite.Core, Version=1.8.0.1147, Culture=neutral, PublicKeyToken=a487a7ff0b2aaa4a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Apache.Ignite.1.8.0-nightly1147\lib\net40\Apache.Ignite.Core.dll</HintPath>
+    <Reference Include="Apache.Ignite.Core, Version=1.8.0.16164, Culture=neutral, PublicKeyToken=a487a7ff0b2aaa4a, processorArchitecture=MSIL">
+      <HintPath>..\packages\Apache.Ignite.1.8.0\lib\net40\Apache.Ignite.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Apache.Ignite.Linq, Version=1.8.0.1147, Culture=neutral, PublicKeyToken=a487a7ff0b2aaa4a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Apache.Ignite.Linq.1.8.0-nightly1147\lib\net40\Apache.Ignite.Linq.dll</HintPath>
+    <Reference Include="Apache.Ignite.Linq, Version=1.8.0.16164, Culture=neutral, PublicKeyToken=a487a7ff0b2aaa4a, processorArchitecture=MSIL">
+      <HintPath>..\packages\Apache.Ignite.Linq.1.8.0\lib\net40\Apache.Ignite.Linq.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="EntityFramework, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
@@ -112,7 +112,7 @@
 if not exist "$(TargetDir)Libs" md "$(TargetDir)Libs"
 xcopy /s /y "$(SolutionDir)packages\Apache.Ignite.1.7.0\Libs\*.*" "$(TargetDir)Libs"
 if not exist "$(TargetDir)Libs" md "$(TargetDir)Libs"
-xcopy /s /y "$(SolutionDir)packages\Apache.Ignite.1.8.0-nightly1147\Libs\*.*" "$(TargetDir)Libs"</PostBuildEvent>
+xcopy /s /y "$(SolutionDir)packages\Apache.Ignite.1.8.0\Libs\*.*" "$(TargetDir)Libs"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

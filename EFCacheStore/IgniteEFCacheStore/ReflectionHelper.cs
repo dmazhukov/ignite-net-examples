@@ -82,5 +82,11 @@ namespace IgniteEFCacheStore
             //return new Type[] {typeof(Contractor),typeof(Month),typeof(Payment),typeof(PaymentRequest),typeof(SalePoint),
             //    typeof(SellOut),typeof(Contract),typeof(ContractMonth),typeof(PaymentPlan)};
         }
+
+        public static Type[] GetTimViewTypes()
+        {
+            return typeof(Tim_DB_Entities).Assembly.GetTypes().Where(t => t.IsPublic && t.IsClass && !t.IsAbstract
+            && t.Name.EndsWith("View")).ToArray();
+        }
     }
 }

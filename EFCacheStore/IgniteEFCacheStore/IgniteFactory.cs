@@ -75,7 +75,7 @@ namespace IgniteEFCacheStore
                     {
                         if (t == typeof(Month))
                         {
-                            return new BinaryTypeConfiguration(typeof(Month))
+                            return new BinaryTypeConfiguration(t)
                             {
                                 Serializer = new MonthSerializer()
                             };
@@ -83,7 +83,7 @@ namespace IgniteEFCacheStore
 
                         if (t == typeof(Contract))
                         {
-                            return new BinaryTypeConfiguration(typeof(Contract))
+                            return new BinaryTypeConfiguration(t)
                             {
                                 Serializer = new ContractSerializer()
                             };
@@ -133,7 +133,7 @@ namespace IgniteEFCacheStore
             else
             {
                 var method = typeof(IIgnite).GetMethods().FirstOrDefault(m => m.Name == "GetOrCreateCache"
-&& m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(CacheConfiguration));
+                            && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(CacheConfiguration));
                 var gm = method.MakeGenericMethod(typeof(int), t);
                 var param = new object[]
                 {

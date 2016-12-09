@@ -75,6 +75,29 @@ namespace IgniteEFCacheStore
 
 
     }
+    public class PaymentPlanReal
+    {
+        [QuerySqlField]
+        public int ID { get; set; }
+        [QuerySqlField]
+        public int ContractID { get; set; }
+        [QuerySqlField]
+        public int ContractStatusID { get; set; }
+        [QuerySqlField]
+        public int MonthID { get; set; }
+        [QuerySqlField]
+        public int ContractorID { get; set; }
+        [QuerySqlField]
+        public int PaymentPlanID { get; set; }
+        [QuerySqlField]
+        public decimal PaymentPlanValue { get; set; }
+        [QuerySqlField]
+        public int? PaymentPlanSkuID { get; set; }
+        [QuerySqlField]
+        public decimal? PaymentPlanSkuQuantity { get; set; }
+        [QuerySqlField]
+        public int? ActualYear { get; set; }
+    }
     /*
         [Table("PaymentPlanRealView")]
         [Serializable]

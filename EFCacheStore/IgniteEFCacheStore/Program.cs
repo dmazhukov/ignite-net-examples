@@ -21,13 +21,14 @@ using LogLevel = Apache.Ignite.Core.Log.LogLevel;
 
 namespace IgniteEFCacheStore
 {
+
     public static class Program
     {
         public static void Main(string[] args)
         {
             Ignition.ClientMode = args.Any(s => s.Contains("client"));
 
-            if(!Ignition.ClientMode)
+            if (!Ignition.ClientMode)
                 Environment.SetEnvironmentVariable("IGNITE_H2_DEBUG_CONSOLE", "true");
 
             IgniteFactory.GetIgnite();
@@ -122,30 +123,19 @@ namespace IgniteEFCacheStore
                     from icm in icms
                     from pp in pps
                     from im in ims
+
                     where icm.Value.ContractID == ic.Value.ID && pp.Value.ContractMonthID == icm.Value.ID && icm.Value.MonthID == im.Value.ID
-                          && (ic.Value.ContractStatusID != 7 || im.Value.ActualDate < ic.Value.AnnulDate)
-                          && pp.Value.IsReassigned == false && ic.Value.ContractStatusID != 5
-                    select new
-                    {
-                        ID = pp.Value.ID,
-                        ContractID = ic.Value.ID,
-                        ContractStatusID = ic.Value.ContractStatusID,
-                        MonthID = icm.Value.MonthID,
-                        ContractorID = ic.Value.ContractorID,
-                        PaymentPlanID = pp.Value.ID,
-                        PaymentPlanValue = pp.Value.Value,
-                        PaymentPlanSkuID = pp.Value.SkuId,
-                        PaymentPlanSkuQuantity = pp.Value.SkuQuantity,
-                        ActualYear = im.Value.ActualYear
-                    };
+                              && (ic.Value.ContractStatusID != 7 || im.Value.ActualDate < ic.Value.AnnulDate)
+                              && pp.Value.IsReassigned == false && ic.Value.ContractStatusID != 5
+                    select new  { ID = pp.Value.ID, ContractID = ic.Value.ID, ContractStatusID = ic.Value.ContractStatusID, MonthID = icm.Value.MonthID, ContractorID = ic.Value.ContractorID, PaymentPlanID = pp.Value.ID, PaymentPlanValue = pp.Value.Value, PaymentPlanSkuID = pp.Value.SkuId, PaymentPlanSkuQuantity = pp.Value.SkuQuantity, ActualYear = im.Value.ActualYear };
 
             Console.WriteLine($"Executing SQL: {(q as ICacheQueryable).GetFieldsQuery().Sql}");
 
             //var cnt = q.Count();
-            var arr = q.Take(1).ToArray();
+            var arr = q.ToArray();
             var cnt = arr.Length;
             Console.WriteLine($"{cnt} records in {sw.Elapsed}");
-            
+
         }
 
         private static void RunIgniteStressTest()
