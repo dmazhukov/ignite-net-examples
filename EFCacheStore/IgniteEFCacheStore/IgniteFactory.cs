@@ -30,6 +30,15 @@ namespace IgniteEFCacheStore
             //    sw.Restart();
             //});
 
+
+            //foreach (var type in ReflectionHelper.GetTimTypes())
+            //{
+            //    var sw = Stopwatch.StartNew();
+            //    LoadCache(type);
+            //    Console.WriteLine($"{_caches[type].GetType().GetMethod("GetSize").Invoke(_caches[type], new object[] { null })} {type.Name}s loaded in {sw.Elapsed}");
+            //    sw.Restart();
+            //}
+
             var tasks = ReflectionHelper.GetTimTypes().Select(type =>
                   Task.Run(() =>
                   {
@@ -64,6 +73,7 @@ namespace IgniteEFCacheStore
             return _ignite;
         }
 
+        
         public static IgniteConfiguration CreateConfiguration()
         {
             return new IgniteConfiguration

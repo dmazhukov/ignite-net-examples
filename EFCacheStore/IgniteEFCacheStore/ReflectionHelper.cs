@@ -77,7 +77,8 @@ namespace IgniteEFCacheStore
             && !t.Name.StartsWith("Asp") && !t.Name.EndsWith("View") && !t.Name.EndsWith("Tim_DB_Entities")
             && !t.Name.EndsWith("Repository") && !t.Name.EndsWith("ComplexPK") && !t.Name.EndsWith("Wrapper")
             && !t.Name.EndsWith("Configuration") && !t.Name.EndsWith("_test") && !t.Name.EndsWith("Extension")
-            && !t.Name.EndsWith("LogWorker") && !t.Name.EndsWith("Factory")).ToArray();
+            && !t.Name.EndsWith("LogWorker") && !t.Name.EndsWith("Factory")&& !t.Name.EndsWith("Provider")
+            && !t.Name.EndsWith("Policy")).ToArray();
             //return new Type[] { typeof(Month) };
             //return new Type[] {typeof(Contractor),typeof(Month),typeof(Payment),typeof(PaymentRequest),typeof(SalePoint),
             //    typeof(SellOut),typeof(Contract),typeof(ContractMonth),typeof(PaymentPlan)};

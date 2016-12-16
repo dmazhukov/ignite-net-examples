@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IgniteEFCacheStore", "Ignit
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tim.DataAccess", "..\..\timservice\Tim\Tim.DataAccess\Tim.DataAccess.csproj", "{57D13E77-3B66-4158-9BAB-B81C6FB925B2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IgniteCacheService", "IgniteCacheService\IgniteCacheService.csproj", "{94E64DBE-D137-4E34-90E0-B846AB1F7B2C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{57D13E77-3B66-4158-9BAB-B81C6FB925B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{57D13E77-3B66-4158-9BAB-B81C6FB925B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{57D13E77-3B66-4158-9BAB-B81C6FB925B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{94E64DBE-D137-4E34-90E0-B846AB1F7B2C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{94E64DBE-D137-4E34-90E0-B846AB1F7B2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{94E64DBE-D137-4E34-90E0-B846AB1F7B2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{94E64DBE-D137-4E34-90E0-B846AB1F7B2C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

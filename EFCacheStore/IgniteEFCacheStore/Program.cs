@@ -51,7 +51,15 @@ namespace IgniteEFCacheStore
                         IgniteFactory.LoadCaches();
                         break;
                     case 'r':
-                        RunQueryPPRV();
+                        RunQueryGetBudgetDataSections();
+                        break;
+                    case 'p':
+                        var actions = new List<Action>();
+                        for (int i = 0; i < 10; i++)
+                        {
+                            actions.Add(RunQueryPPRV);
+                        }
+                        Parallel.Invoke(actions.ToArray());
                         break;
                     case 's':
                         RunIgniteStressTest();
@@ -128,6 +136,67 @@ namespace IgniteEFCacheStore
                               && (ic.Value.ContractStatusID != 7 || im.Value.ActualDate < ic.Value.AnnulDate)
                               && pp.Value.IsReassigned == false && ic.Value.ContractStatusID != 5
                     select new  { ID = pp.Value.ID, ContractID = ic.Value.ID, ContractStatusID = ic.Value.ContractStatusID, MonthID = icm.Value.MonthID, ContractorID = ic.Value.ContractorID, PaymentPlanID = pp.Value.ID, PaymentPlanValue = pp.Value.Value, PaymentPlanSkuID = pp.Value.SkuId, PaymentPlanSkuQuantity = pp.Value.SkuQuantity, ActualYear = im.Value.ActualYear };
+
+            Console.WriteLine($"Executing SQL: {(q as ICacheQueryable).GetFieldsQuery().Sql}");
+
+            //var cnt = q.Count();
+            var arr = q.ToArray();
+            var cnt = arr.Length;
+            Console.WriteLine($"{cnt} records in {sw.Elapsed}");
+
+        }
+
+        private static void RunQueryGetBudgetDataSections()
+        {
+            var sw = Stopwatch.StartNew();
+
+            var user = new User {ID = 12021};
+            var regionsToRole = IgniteFactory.GetCache<RegionToRole>().AsCacheQueryable();
+            var currentUserRegionsToRole = IgniteFactory.GetCache<User>().AsCacheQueryable()
+                .Where(w => w.Value.ID == user.ID && !w.Value.IsDeleted)
+                //.Join(regionsToRole, u=>u.Value.ID, r=>r.Value.RoleID)
+                .SelectMany(sm => sm.Value.RegionToRole);
+
+            var childRegions = currentUserRegionsToRole
+                .SelectMany(rtr => rtr.Region.RegionExpand1)
+                .Select(re => re.Region);
+
+            var regionsAsm = childRegions
+                .Where(w => w.RegionToRole.Any(a => a.RoleID == 7));
+
+            var allInvestTitle = IgniteFactory.GetCache<InvestTitle>().AsCacheQueryable();
+
+            var isFutureYear = false;
+
+            var distributorToRegionAsmBindings = !isFutureYear
+                ? regionsAsm.SelectMany(s => s.DistributorToRegionAsmBinding)
+                : regionsAsm.SelectMany(s => s.DistributorToRegionAsmBinding.Where(b => b.IsActual));
+
+            var resultAllBudgets = distributorToRegionAsmBindings
+                .Select(d => new { Distributor = d.Distributor, RegionAsm = d.Region, d })
+                .SelectMany(dr => allInvestTitle, (dr, t) => new { dr.Distributor, dr.RegionAsm, InvestTitle = t, dr.d });
+
+            var allBudgets = resultAllBudgets
+        .Select(b => new 
+        {
+            AsmRegionId = b.RegionAsm.ID,
+            AsmRegionName = b.RegionAsm.Name,
+            DistributorId = b.Distributor.ID,
+            DistributorName = b.Distributor.Name,
+            RsmRegionId = b.RegionAsm.RegionExpand
+                .Where(w => w.Region1.RegionToRole.Any(a => a.RoleID == 5))
+                .Select(ss => ss.ParentRegionID)
+                .FirstOrDefault(),
+            RsmRegionName = b.RegionAsm.RegionExpand
+                .Where(w => w.Region1.RegionToRole.Any(a => a.RoleID == 5))
+                .Select(ss => ss.Region1.Name)
+                .FirstOrDefault(),
+            InvestTitleId = b.InvestTitle.Value.ID,
+            InvestTitleName = b.InvestTitle.Value.Name,
+        });
+            var q = allBudgets.GroupBy(gb => new { gb.RsmRegionId, gb.RsmRegionName })
+                .Select(s => new { RegionId = s.Key.RsmRegionId, RegionName = s.Key.RsmRegionName, Count = s.Count() })
+                .ToList();
 
             Console.WriteLine($"Executing SQL: {(q as ICacheQueryable).GetFieldsQuery().Sql}");
 

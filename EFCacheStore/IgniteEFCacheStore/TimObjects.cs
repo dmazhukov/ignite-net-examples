@@ -45,6 +45,7 @@ namespace IgniteEFCacheStore
         private static Dictionary<Type, PropertyInfo> piMap = new Dictionary<Type, PropertyInfo>();
         public static object GetKey<T>(object entity) where T : class
         {
+            // TODO!!!: handle complex keys
             PropertyInfo pi = null;
             if (!piMap.TryGetValue(typeof (T), out pi))
             {
