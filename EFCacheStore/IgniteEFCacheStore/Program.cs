@@ -151,18 +151,30 @@ namespace IgniteEFCacheStore
             var sw = Stopwatch.StartNew();
 
             var user = new User {ID = 12021};
+            var userId = 12021;
             var regionsToRole = IgniteFactory.GetCache<RegionToRole>().AsCacheQueryable();
-            var currentUserRegionsToRole = IgniteFactory.GetCache<User>().AsCacheQueryable()
-                .Where(w => w.Value.ID == user.ID && !w.Value.IsDeleted)
-                //.Join(regionsToRole, u=>u.Value.ID, r=>r.Value.RoleID)
+            var users = IgniteFactory.GetCache<User>().AsCacheQueryable();
+            var currentUserRegionsToRole = users
+                .Where(w => w.Value.ID == userId && !w.Value.IsDeleted)
+                .Join(regionsToRole, u=>u.Value.ID, r=>r.Value.RoleID,(userr,role) => userr)
+                //.SelectMany(sm => sm.Value.RegionToRole);
+                .ToList()
                 .SelectMany(sm => sm.Value.RegionToRole);
+
+
+
+            var q1 = currentUserRegionsToRole.ToList();
 
             var childRegions = currentUserRegionsToRole
                 .SelectMany(rtr => rtr.Region.RegionExpand1)
                 .Select(re => re.Region);
 
+            var q2 = childRegions.ToList();
+
             var regionsAsm = childRegions
                 .Where(w => w.RegionToRole.Any(a => a.RoleID == 7));
+
+            var q3 = regionsAsm.ToList();
 
             var allInvestTitle = IgniteFactory.GetCache<InvestTitle>().AsCacheQueryable();
 
@@ -172,9 +184,13 @@ namespace IgniteEFCacheStore
                 ? regionsAsm.SelectMany(s => s.DistributorToRegionAsmBinding)
                 : regionsAsm.SelectMany(s => s.DistributorToRegionAsmBinding.Where(b => b.IsActual));
 
+            var q4 = distributorToRegionAsmBindings.ToList();
+
             var resultAllBudgets = distributorToRegionAsmBindings
                 .Select(d => new { Distributor = d.Distributor, RegionAsm = d.Region, d })
                 .SelectMany(dr => allInvestTitle, (dr, t) => new { dr.Distributor, dr.RegionAsm, InvestTitle = t, dr.d });
+
+            var q5 = resultAllBudgets.ToList();
 
             var allBudgets = resultAllBudgets
         .Select(b => new 
@@ -194,6 +210,7 @@ namespace IgniteEFCacheStore
             InvestTitleId = b.InvestTitle.Value.ID,
             InvestTitleName = b.InvestTitle.Value.Name,
         });
+            var q6 = allBudgets.ToList();
             var q = allBudgets.GroupBy(gb => new { gb.RsmRegionId, gb.RsmRegionName })
                 .Select(s => new { RegionId = s.Key.RsmRegionId, RegionName = s.Key.RsmRegionName, Count = s.Count() })
                 .ToList();

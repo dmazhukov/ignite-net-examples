@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 using Apache.Ignite.Core;
 using Apache.Ignite.Core.Cache;
 using Apache.Ignite.Core.Cache.Configuration;
@@ -88,6 +89,29 @@ namespace IgniteEFCacheStore
         {
             return typeof(Tim_DB_Entities).Assembly.GetTypes().Where(t => t.IsPublic && t.IsClass && !t.IsAbstract
             && t.Name.EndsWith("View")).ToArray();
+        }
+    }
+
+    public static class IgniteConfigurationExtensions
+    {
+        public static string ToXml(this IgniteConfiguration cfg)
+        {
+            var sb = new StringBuilder();
+
+            var settings = new XmlWriterSettings
+            {
+                Indent = true
+            };
+
+            using (var xmlWriter = XmlWriter.Create(sb, settings))
+            {
+                typeof(Ignition).Assembly
+                    .GetType("Apache.Ignite.Core.Impl.Common.IgniteConfigurationXmlSerializer")
+                    .GetMethod("Serialize")
+                    .Invoke(null, new object[] { cfg, xmlWriter, "igniteConfiguration" });
+            }
+
+            return sb.ToString();
         }
     }
 }

@@ -8,6 +8,8 @@ using Apache.Ignite.Core.Binary;
 using Apache.Ignite.Core.Cache;
 using Apache.Ignite.Core.Cache.Configuration;
 using Apache.Ignite.Core.Compute;
+using Apache.Ignite.Core.Discovery.Tcp;
+using Apache.Ignite.Core.Discovery.Tcp.Static;
 using IgniteEFCacheStore.Actions;
 using IgniteEFCacheStore.Serializers;
 using Tim.DataAccess;
@@ -106,7 +108,12 @@ namespace IgniteEFCacheStore
                     }).ToArray(),
                 },
 
-
+                DiscoverySpi = new TcpDiscoverySpi
+                {
+                    JoinTimeout = TimeSpan.FromSeconds(5),
+                    //IpFinder = new TcpDiscoveryMulticastIpFinder {ResponseTimeout = TimeSpan.FromSeconds(5)}
+                    IpFinder = new TcpDiscoveryStaticIpFinder { Endpoints = new[] {"10.8.1.109", "10.100.100.31", "10.100.100.32", "10.100.100.33" } }
+                },
 
                 GridName = "timtest",
                 JvmInitialMemoryMb = Ignition.ClientMode ? IgniteConfiguration.DefaultJvmInitMem : 25000,
